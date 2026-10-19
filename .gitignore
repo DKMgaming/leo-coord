@@ -1,0 +1,17 @@
+# môi trường & cache Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# output chạy thử
+out/
+*.db
+*.html
+
+# hệ điều hành / editor
+.DS_Store
+.idea/
+.vscode/
