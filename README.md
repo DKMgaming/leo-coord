@@ -33,6 +33,18 @@ python3 -m venv .venv
 .venv/bin/pytest
 ```
 
+## Web app
+
+Giao diện web 2 tab trên cùng engine (xem `webapp/README.md`):
+Tab 1 — chức năng chính + bản đồ số 3D; Tab 2 — tham luận & tài liệu
+(upload Word/Excel/PDF/PowerPoint).
+
+```bash
+.venv/bin/pip install fastapi "uvicorn[standard]" python-multipart
+.venv/bin/uvicorn webapp.backend.app:app --host 0.0.0.0 --port 8000
+# mở http://localhost:8000
+```
+
 ## Cấu trúc
 
 - `leo_coord/` — mã nguồn (orbits, coverage, pfd, epfd, coordination, milestones, database, report, cli)

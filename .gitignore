@@ -11,6 +11,9 @@ out/
 *.db
 *.html
 
+# dữ liệu người dùng của web app (tài liệu tham luận upload lên)
+webapp/data/
+
 # hệ điều hành / editor
 .DS_Store
 .idea/
