@@ -59,6 +59,19 @@ def test_tracks(client):
     assert len(t["tracks"][0]) == 12 and len(t["tracks"][0][0]) == 3
 
 
+def test_visible_sats(client):
+    body = {**SMALL, "n_sats": 12, "lat": 21.0285, "lon": 105.8542,
+            "t_s": 0.0}
+    r = client.post("/api/visible-sats", json=body)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["n_visible"] >= 0
+    els = [s["elevation_deg"] for s in d["satellites"]]
+    assert els == sorted(els, reverse=True)  # sắp xếp giảm dần theo ngẩng
+    assert all(s["elevation_deg"] >= d["min_elev_deg"] for s in d["satellites"])
+    assert all(0.0 <= s["azimuth_deg"] < 360.0 for s in d["satellites"])
+
+
 def test_coverage_map(client):
     r = client.post("/api/coverage-map", json={**SMALL, "n_sats": 6})
     assert r.status_code == 200

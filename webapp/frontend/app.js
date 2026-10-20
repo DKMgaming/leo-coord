@@ -1,4 +1,4 @@
-/* leo_coord web app — tab 1: chức năng + bản đồ 3D; tab 2: tham luận & tài liệu */
+/* leo_coord web app — tab 1: chức năng + bản đồ 3D (CesiumJS); tab 2: tham luận & tài liệu */
 "use strict";
 
 /* ---------------- tab switching ---------------- */
@@ -16,6 +16,9 @@ document.querySelectorAll(".tab").forEach(btn => {
 const $ = id => document.getElementById(id);
 const fmtPct = v => (v * 100).toFixed(1) + "%";
 function badge(text, cls) { return `<span class="badge ${cls}">${text}</span>`; }
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 function formParams() {
   const deployed = [];
@@ -132,170 +135,207 @@ function renderResults(a) {
   el.innerHTML = h;
 }
 
-function esc(s) {
-  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-/* ---------------- tab 1: 3D globe ---------------- */
+/* ---------------- tab 1: bản đồ số 3D (CesiumJS) ---------------- */
 async function initGlobe() {
-  let THREE, OrbitControls;
-  try {
-    THREE = await import("three");
-    ({OrbitControls} = await import("three/addons/controls/OrbitControls.js"));
-  } catch (err) {
+  if (typeof Cesium === "undefined") {
     const e = $("globe-error");
-    e.textContent = "Không tải được thư viện 3D (cần kết nối mạng tới CDN). Các chức năng tính toán vẫn dùng được.";
+    e.textContent = "Không tải được thư viện CesiumJS (cần kết nối mạng tới CDN). Các chức năng tính toán vẫn dùng được.";
     e.classList.remove("hidden");
     return;
   }
 
-  const R_E = 6371.0, R = 1;
-  const ecefToScene = (x, y, z) =>
-    new THREE.Vector3(x / R_E * R, z / R_E * R, -y / R_E * R);
-  const llToScene = (lat, lon, altKm) => {
-    const r = R * (1 + altKm / R_E);
-    const phi = (90 - lat) * Math.PI / 180, theta = (lon + 180) * Math.PI / 180;
-    return new THREE.Vector3(
-      -r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
-  };
-
-  const container = $("viewport");
-  const renderer = new THREE.WebGLRenderer({antialias: true});
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  container.appendChild(renderer.domElement);
-  const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x05080f);
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
-  camera.position.set(0, 1.2, 3.2);
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true; controls.minDistance = 1.4; controls.maxDistance = 30;
-  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(5, 2, 3); scene.add(sun);
-
-  // Trái Đất
-  const earthMat = new THREE.MeshPhongMaterial({color: 0x1c3d6e});
-  const earth = new THREE.Mesh(new THREE.SphereGeometry(R, 48, 32), earthMat);
-  scene.add(earth);
-  new THREE.TextureLoader().load(
-    "https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-blue-marble.jpg",
-    t => { earthMat.map = t; earthMat.color.set(0xffffff); earthMat.needsUpdate = true; },
-    undefined, () => {});
-  const wire = new THREE.LineSegments(
-    new THREE.WireframeGeometry(new THREE.SphereGeometry(R * 1.002, 24, 16)),
-    new THREE.LineBasicMaterial({color: 0x3b82f6, transparent: true, opacity: 0.07}));
-  scene.add(wire);
-  const glow = new THREE.Mesh(new THREE.SphereGeometry(R * 1.06, 48, 32),
-    new THREE.MeshBasicMaterial({color: 0x3a7bd5, transparent: true, opacity: 0.08, side: THREE.BackSide}));
-  scene.add(glow);
-
-  // sao nền
-  {
-    const n = 800, pos = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
-      const v = new THREE.Vector3().randomDirection().multiplyScalar(40);
-      pos.set([v.x, v.y, v.z], i * 3);
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    scene.add(new THREE.Points(g, new THREE.PointsMaterial({color: 0x8899bb, size: 0.15})));
+  // địa hình thật (ArcGIS World Elevation) — rớt về ellipsoid nếu không có lớp này
+  let terrainProvider;
+  try {
+    terrainProvider = new Cesium.ArcGISTiledElevationTerrainProvider({
+      url: "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer",
+    });
+  } catch (err) {
+    terrainProvider = new Cesium.EllipsoidTerrainProvider();
   }
 
-  const satGroup = new THREE.Group(), orbitGroup = new THREE.Group(),
-        covGroup = new THREE.Group(), markGroup = new THREE.Group();
-  scene.add(satGroup, orbitGroup, covGroup, markGroup);
-
-  // điểm tham chiếu VN + vệ tinh GSO + vành GEO
-  const VN_PTS = [[21.0285, 105.8542, "Hà Nội"], [16.0544, 108.2022, "Đà Nẵng"], [10.8231, 106.6297, "TP.HCM"]];
-  VN_PTS.forEach(([la, lo]) => {
-    const m = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 12),
-      new THREE.MeshBasicMaterial({color: 0xff9f1c}));
-    m.position.copy(llToScene(la, lo, 10)); markGroup.add(m);
+  const viewer = new Cesium.Viewer("viewport", {
+    imageryProvider: false,
+    baseLayerPicker: false,
+    geocoder: false,
+    timeline: false,
+    animation: false,
+    infoBox: false,
+    selectionIndicator: false,
+    navigationHelpButton: false,
+    terrainProvider,
   });
-  let gsoMarker = null, geoRing = null;
+
+  // Lớp ảnh nền chuyển đổi được (giống các lớp GIS của Atlas)
+  const BASEMAPS = {
+    esri: () => new Cesium.UrlTemplateImageryProvider({
+      url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      maximumLevel: 18, credit: "Esri World Imagery" }),
+    osm: () => new Cesium.UrlTemplateImageryProvider({
+      url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      maximumLevel: 19, credit: "© OpenStreetMap contributors" }),
+    dark: () => new Cesium.UrlTemplateImageryProvider({
+      url: "https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+      maximumLevel: 18, credit: "© CARTO · © OpenStreetMap contributors" }),
+  };
+  const imageryLayers = viewer.imageryLayers;
+  let baseLayer = imageryLayers.addImageryProvider(BASEMAPS.esri());
+  $("basemap").addEventListener("change", ev => {
+    imageryLayers.remove(baseLayer, true);
+    baseLayer = imageryLayers.addImageryProvider(BASEMAPS[ev.target.value]());
+  });
+
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(105.8, 15.5, 9000000),
+    orientation: { heading: 0.0, pitch: -Math.PI / 2, roll: 0.0 },
+  });
+
+  const sim = { tracks: [], period: 6000, nPlanes: 6, nSats: 0,
+                playing: true, speed: 120, t: 0,
+                satPrims: [], scratch: [] };
+  let satPts = null, covPts = null;
+  const orbitEntities = [];
+  const ecefToCart = p => new Cesium.Cartesian3(p[0] * 1000, p[1] * 1000, p[2] * 1000);
+  const fracColor = f => new Cesium.Color(0.9 - 0.7 * f, 0.2 + 0.7 * f, 0.2, 0.9);
+
+  // Điểm tham chiếu Việt Nam
+  [["Hà Nội", 21.0285, 105.8542], ["Đà Nẵng", 16.0544, 108.2022],
+   ["TP.HCM", 10.8231, 106.6297]].forEach(([name, la, lo]) => {
+    viewer.entities.add({
+      name,
+      position: Cesium.Cartesian3.fromDegrees(lo, la, 5000),
+      point: { pixelSize: 10, color: Cesium.Color.ORANGE,
+               outlineColor: Cesium.Color.BLACK, outlineWidth: 1 },
+      label: { text: name, font: "13px sans-serif", fillColor: Cesium.Color.WHITE,
+               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+               outlineColor: Cesium.Color.BLACK,
+               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+               pixelOffset: new Cesium.Cartesian2(0, -14),
+               disableDepthTestDistance: Number.POSITIVE_INFINITY },
+    });
+  });
+
+  // Vệ tinh GSO + vành GEO
+  let gsoEntity = null, geoEntity = null;
   function setGSO(lon) {
-    if (gsoMarker) { markGroup.remove(gsoMarker); scene.remove(geoRing); }
-    const Rg = 42164 / R_E;
-    gsoMarker = new THREE.Mesh(new THREE.SphereGeometry(0.02, 12, 12),
-      new THREE.MeshBasicMaterial({color: 0xc26bff}));
-    gsoMarker.position.copy(ecefToScene(Rg * R_E * Math.cos(lon * Math.PI / 180),
-                                        Rg * R_E * Math.sin(lon * Math.PI / 180), 0));
-    markGroup.add(gsoMarker);
-    const pts = [];
+    if (gsoEntity) { viewer.entities.remove(gsoEntity); viewer.entities.remove(geoEntity); }
+    gsoEntity = viewer.entities.add({
+      name: "Vệ tinh GSO",
+      position: Cesium.Cartesian3.fromDegrees(lon, 0, 35793000),
+      point: { pixelSize: 12, color: Cesium.Color.VIOLET },
+      label: { text: "GSO " + lon.toFixed(1) + "°E", font: "12px sans-serif",
+               fillColor: Cesium.Color.VIOLET,
+               verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+               pixelOffset: new Cesium.Cartesian2(0, -14) },
+    });
+    const Rg = 42164 * 1000, ring = [];
     for (let i = 0; i <= 128; i++) {
       const a = i / 128 * Math.PI * 2;
-      pts.push(new THREE.Vector3(Rg * Math.cos(a), 0, -Rg * Math.sin(a)));
+      ring.push(new Cesium.Cartesian3(Rg * Math.cos(a), Rg * Math.sin(a), 0));
     }
-    geoRing = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({color: 0xc26bff, transparent: true, opacity: 0.25}));
-    scene.add(geoRing);
-  }
-
-  // trạng thái mô phỏng
-  const sim = {tracks: [], period: 6000, nPlanes: 6, nSats: 0,
-               playing: true, speed: 120, t: 0, satPoints: null};
-
-  function fracColor(f, out) {
-    if (f < 0.5) out.setRGB(0.9, 0.2 + 1.4 * f, 0.2);
-    else out.setRGB(0.9 - 1.4 * (f - 0.5), 0.9, 0.2);
-    return out;
+    geoEntity = viewer.entities.add({
+      polyline: { positions: ring, width: 1,
+                  material: Cesium.Color.VIOLET.withAlpha(0.3) },
+    });
   }
 
   async function refresh(params) {
-    // vệ tinh + quỹ đạo
     const tr = await (await fetch("/api/tracks", {
       method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({...params, samples: 90}),
+      body: JSON.stringify({ ...params, samples: 90 }),
     })).json();
-    sim.tracks = tr.tracks.map(sat => sat.map(p => ecefToScene(p[0], p[1], p[2])));
     sim.period = tr.period_s; sim.nPlanes = tr.n_planes; sim.nSats = tr.n_sats;
-    satGroup.clear();
-    const pos = new Float32Array(sim.nSats * 3);
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    sim.satPoints = new THREE.Points(g, new THREE.PointsMaterial(
-      {color: 0x33d1ff, size: 0.022, transparent: true, opacity: 0.95}));
-    satGroup.add(sim.satPoints);
-    orbitGroup.clear();
+    sim.tracks = tr.tracks.map(sat => sat.map(ecefToCart));
+
+    if (satPts) viewer.scene.primitives.remove(satPts);
+    satPts = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    sim.satPrims = []; sim.scratch = [];
+    for (let s = 0; s < sim.nSats; s++) {
+      sim.scratch.push(new Cesium.Cartesian3());
+      sim.satPrims.push(satPts.add({
+        position: sim.tracks[s][0].clone(),
+        color: Cesium.Color.CYAN, pixelSize: 6,
+      }));
+    }
+    orbitEntities.forEach(e => viewer.entities.remove(e));
+    orbitEntities.length = 0;
     const perPlane = Math.max(1, Math.round(sim.nSats / sim.nPlanes));
     for (let p = 0; p < sim.nPlanes; p++) {
       const idx = Math.min(sim.nSats - 1, p * perPlane);
-      const line = new THREE.LineLoop(
-        new THREE.BufferGeometry().setFromPoints(sim.tracks[idx]),
-        new THREE.LineBasicMaterial({color: 0x2a6fd6, transparent: true, opacity: 0.3}));
-      orbitGroup.add(line);
+      orbitEntities.push(viewer.entities.add({
+        polyline: { positions: sim.tracks[idx], width: 1, loop: true,
+                    material: Cesium.Color.DODGERBLUE.withAlpha(0.35) },
+      }));
     }
-    // phủ sóng
+
     const cm = await (await fetch("/api/coverage-map", {
       method: "POST", headers: {"Content-Type": "application/json"},
       body: JSON.stringify(params),
     })).json();
-    covGroup.clear();
-    const cells = cm.cells.filter(c => c.fraction > 0.02);
-    const cp = new Float32Array(cells.length * 3), cc = new Float32Array(cells.length * 3);
-    const col = new THREE.Color();
-    cells.forEach((c, i) => {
-      const v = llToScene(c.lat, c.lon, 8);
-      cp.set([v.x, v.y, v.z], i * 3);
-      fracColor(c.fraction, col); cc.set([col.r, col.g, col.b], i * 3);
+    if (covPts) viewer.scene.primitives.remove(covPts);
+    covPts = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    cm.cells.forEach(c => {
+      if (c.fraction < 0.02) return;
+      covPts.add({
+        position: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, 8000),
+        color: fracColor(c.fraction), pixelSize: 5,
+      });
     });
-    const cg = new THREE.BufferGeometry();
-    cg.setAttribute("position", new THREE.BufferAttribute(cp, 3));
-    cg.setAttribute("color", new THREE.BufferAttribute(cc, 3));
-    covGroup.add(new THREE.Points(cg, new THREE.PointsMaterial(
-      {size: 0.02, vertexColors: true, transparent: true, opacity: 0.85})));
+
     setGSO(params.gso_lon || 105.5);
     applyLayers();
   }
 
   function applyLayers() {
-    satGroup.visible = $("layer-sats").checked;
-    orbitGroup.visible = $("layer-orbits").checked;
-    covGroup.visible = $("layer-cov").checked;
+    if (satPts) satPts.show = $("layer-sats").checked;
+    orbitEntities.forEach(e => { e.show = $("layer-orbits").checked; });
+    if (covPts) covPts.show = $("layer-cov").checked;
   }
   ["layer-sats", "layer-orbits", "layer-cov"].forEach(id =>
     $(id).addEventListener("change", applyLayers));
 
+  /* Click vào bản đồ: tra cứu vệ tinh khả kiến tại điểm đó */
+  const pickBox = $("pick-info");
+  let pickEntity = null;
+  viewer.screenSpaceEventHandler.setInputAction(async click => {
+    const cart = viewer.camera.pickEllipsoid(click.position, viewer.scene.globe.ellipsoid);
+    if (!cart) return;
+    const cc = viewer.scene.globe.ellipsoid.cartesianToCartographic(cart);
+    const lat = Cesium.Math.toDegrees(cc.latitude);
+    const lon = Cesium.Math.toDegrees(cc.longitude);
+    if (pickEntity) viewer.entities.remove(pickEntity);
+    pickEntity = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, 5000),
+      point: { pixelSize: 12, color: Cesium.Color.YELLOW,
+               outlineColor: Cesium.Color.BLACK, outlineWidth: 2 },
+    });
+    pickBox.classList.remove("hidden");
+    pickBox.innerHTML = `<b>Điểm (${lat.toFixed(2)}°, ${lon.toFixed(2)}°)</b><br>
+      <span class="hint">Đang tra cứu…</span>`;
+    try {
+      const r = await fetch("/api/visible-sats", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ ...formParams(), lat, lon, t_s: sim.t }),
+      });
+      const d = await r.json();
+      const rows = d.satellites.map(s =>
+        `<tr><td>${esc(s.name)}</td><td>${s.elevation_deg.toFixed(1)}°</td>
+         <td>${s.azimuth_deg.toFixed(0)}°</td><td>${s.range_km.toFixed(0)} km</td></tr>`).join("");
+      pickBox.innerHTML = `<b>Điểm (${lat.toFixed(2)}°, ${lon.toFixed(2)}°)</b>
+        <button class="btn small" id="pick-close">✕</button><br>
+        <span>${d.n_visible} vệ tinh khả kiến (ngẩng ≥ ${d.min_elev_deg}°):</span>
+        <table><tr><th>Vệ tinh</th><th>Ngẩng</th><th>Phương vị</th><th>Cự ly</th></tr>${
+          rows || '<tr><td colspan="4" class="hint">Không có vệ tinh nào</td></tr>'}</table>`;
+      $("pick-close").addEventListener("click", () => {
+        pickBox.classList.add("hidden");
+        if (pickEntity) { viewer.entities.remove(pickEntity); pickEntity = null; }
+      });
+    } catch (err) {
+      pickBox.innerHTML = `<b>Lỗi tra cứu:</b> ${esc(err.message)}`;
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+  /* Animation */
   $("btn-play").addEventListener("click", () => {
     sim.playing = !sim.playing;
     $("btn-play").textContent = sim.playing ? "⏸ Tạm dừng" : "▶ Chạy";
@@ -304,15 +344,6 @@ async function initGlobe() {
     sim.speed = parseInt($("speed").value, 10);
     $("speed-val").textContent = sim.speed + "×";
   });
-
-  function resize() {
-    const w = container.clientWidth, h = container.clientHeight;
-    if (!w || !h) return;
-    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
-  }
-  window.addEventListener("resize", resize);
-
-  const clock = new THREE.Clock();
   function fmtT(s) {
     s = Math.floor(s);
     const h = String(Math.floor(s / 3600)).padStart(2, "0"),
@@ -320,30 +351,26 @@ async function initGlobe() {
           ss = String(s % 60).padStart(2, "0");
     return `T+${h}:${m}:${ss}`;
   }
-  function animate() {
+  let last = performance.now();
+  function animate(now) {
     requestAnimationFrame(animate);
-    const dt = Math.min(clock.getDelta(), 0.1);
-    if (sim.playing && sim.satPoints) {
+    const dt = Math.min((now - last) / 1000, 0.2); last = now;
+    if (sim.playing && sim.satPrims.length) {
       sim.t += dt * sim.speed;
       const N = sim.tracks[0].length;
       const fidx = (sim.t % sim.period) / sim.period * N;
       const i0 = Math.floor(fidx) % N, i1 = (i0 + 1) % N, fr = fidx - Math.floor(fidx);
-      const attr = sim.satPoints.geometry.attributes.position;
       for (let s = 0; s < sim.nSats; s++) {
-        const a = sim.tracks[s][i0], b = sim.tracks[s][i1];
-        attr.setXYZ(s, a.x + (b.x - a.x) * fr, a.y + (b.y - a.y) * fr, a.z + (b.z - a.z) * fr);
+        Cesium.Cartesian3.lerp(sim.tracks[s][i0], sim.tracks[s][i1], fr, sim.scratch[s]);
+        sim.satPrims[s].position = sim.scratch[s];
       }
-      attr.needsUpdate = true;
       $("sim-clock").textContent = fmtT(sim.t);
     }
-    controls.update();
-    renderer.render(scene, camera);
   }
 
-  resize(); animate();
-  const globe = {refresh, resize};
-  window.__globe = globe;
-  await refresh(formParams());  // tải mặc định lúc mở trang
+  window.__globe = { refresh, resize: () => viewer.resize() };
+  await refresh(formParams());
+  requestAnimationFrame(animate);
 }
 
 /* ---------------- tab 2: tham luận & tài liệu ---------------- */

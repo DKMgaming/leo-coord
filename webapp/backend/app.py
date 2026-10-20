@@ -23,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 
 from leo_coord import __version__
 from leo_coord.config import load_config
-from leo_coord.orbits import WalkerConstellation
+from leo_coord.orbits import WalkerConstellation, enu_angles
 from leo_coord.coverage import coverage_grid, point_stats, footprint_radius_km
 from leo_coord.pfd import check_downlink_pfd
 from leo_coord.epfd import single_entry_epfd_down
@@ -201,6 +201,29 @@ def coverage_map(body: dict):
             cells.append({"lat": float(la), "lon": float(lo),
                           "fraction": float(grid["fraction_covered"][i, j])})
     return {"cells": cells, "min_elev_deg": min_el}
+
+
+@app.post("/api/visible-sats")
+def visible_sats(body: dict):
+    """Vệ tinh khả kiến tại một điểm mặt đất ở thời điểm t (click trên bản đồ)."""
+    w = _constellation(body)
+    lat = float(body["lat"])
+    lon = float(body["lon"])
+    t = float(body.get("t_s", 0.0))
+    min_el = float(body.get("min_elev_deg",
+                            CFG["analysis"]["min_elevation_deg"]))
+    pos = w.ecef_positions(np.array([t]))[0]  # (S, 3)
+    az, el, rng = enu_angles(pos, lat, lon)
+    idx = np.where(el >= min_el)[0]
+    order = idx[np.argsort(el[idx])[::-1]]
+    sats = [{"name": w.sat_names[int(i)],
+             "elevation_deg": float(el[i]),
+             "azimuth_deg": float(az[i]),
+             "range_km": float(rng[i])} for i in order[:25]]
+    return _jsonable({"lat": lat, "lon": lon, "t_s": t,
+                      "min_elev_deg": min_el,
+                      "n_visible": int(len(idx)),
+                      "satellites": sats})
 
 
 # ---------------------------------------------------------------- API: tab 2 (tham luận)

@@ -5,7 +5,7 @@ import pytest
 
 from leo_coord.orbits import (
     CircularOrbit, WalkerConstellation, TLEConstellation,
-    gmst_rad, eci_to_ecef, subpoint, elevation_and_range,
+    gmst_rad, eci_to_ecef, subpoint, elevation_and_range, enu_angles,
     R_EARTH, MU,
 )
 
@@ -61,6 +61,29 @@ def test_elevation_below_horizon_negative():
     sat = np.array([[-(R_EARTH + 550.0), 0.0, 0.0]])
     el, _ = elevation_and_range(sat, 0.0, 0.0)
     assert el[0] < 0.0
+
+
+def test_enu_angles_zenith():
+    sat = np.array([[R_EARTH + 550.0, 0.0, 0.0]])
+    az, el, rng = enu_angles(sat, 0.0, 0.0)
+    assert el[0] == pytest.approx(90.0, abs=1e-9)
+    assert rng[0] == pytest.approx(550.0, abs=1e-9)
+
+
+def test_enu_angles_cardinal_points():
+    import math
+    # điểm mặt đất cách 10° về phía Bắc: phương vị 0°, ngẩng -5°
+    sat_n = np.array([[R_EARTH * math.cos(math.radians(10)), 0.0,
+                       R_EARTH * math.sin(math.radians(10))]])
+    az, el, _ = enu_angles(sat_n, 0.0, 0.0)
+    assert az[0] == pytest.approx(0.0, abs=1e-9)
+    assert el[0] == pytest.approx(-5.0, abs=1e-9)
+    # cách 10° về phía Đông: phương vị 90°
+    sat_e = np.array([[R_EARTH * math.cos(math.radians(10)),
+                       R_EARTH * math.sin(math.radians(10)), 0.0]])
+    az2, el2, _ = enu_angles(sat_e, 0.0, 0.0)
+    assert az2[0] == pytest.approx(90.0, abs=1e-9)
+    assert el2[0] == pytest.approx(-5.0, abs=1e-9)
 
 
 def test_walker_counts_and_planes():

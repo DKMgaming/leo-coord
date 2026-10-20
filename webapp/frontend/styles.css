@@ -66,6 +66,21 @@ header{display:flex;align-items:center;justify-content:space-between;
 .globe-error{position:absolute;top:60px;left:50%;transform:translateX(-50%);
   background:#3a1010;border:1px solid var(--bad);padding:12px 18px;border-radius:8px;z-index:5}
 .hidden{display:none}
+#basemap{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+  border-radius:6px;padding:5px;font-size:12px}
+.pick-info{position:absolute;top:60px;right:10px;width:350px;max-height:65%;
+  overflow-y:auto;background:rgba(10,18,36,.96);border:1px solid var(--line);
+  border-radius:10px;padding:12px 14px;font-size:12px;z-index:5}
+.pick-info table{width:100%;border-collapse:collapse;margin-top:8px}
+.pick-info td,.pick-info th{border-bottom:1px solid var(--line);
+  padding:3px 5px;text-align:left;font-size:11px}
+.pick-info th{color:var(--muted);font-weight:normal}
+.pick-hint{position:absolute;top:10px;right:10px;background:rgba(10,18,36,.85);
+  border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px;
+  color:var(--muted)}
+/* Cesium container phủ kín viewport */
+#viewport .cesium-viewer{position:absolute;inset:0}
+#viewport .cesium-viewer-bottom{display:none}
 /* tab2 */
 .docs-wrap{max-width:960px;margin:24px auto;padding:0 16px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;

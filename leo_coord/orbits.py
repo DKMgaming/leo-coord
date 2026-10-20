@@ -99,6 +99,31 @@ def elevation_and_range(sat_ecef: np.ndarray, gs_lat_deg: float, gs_lon_deg: flo
     return el, rng
 
 
+def enu_angles(sat_ecef: np.ndarray, gs_lat_deg: float, gs_lon_deg: float):
+    """Góc phương vị (azimuth, độ từ hướng Bắc theo chiều kim đồng hồ),
+    góc ngẩng (độ) và cự ly (km) từ trạm mặt đất tới vệ tinh.
+
+    sat_ecef: shape (..., 3). Trả về (azimuth_deg, elevation_deg, range_km).
+    """
+    sat = np.asarray(sat_ecef, dtype=float)
+    lat = math.radians(gs_lat_deg)
+    lon = math.radians(gs_lon_deg)
+    sl, cl = math.sin(lat), math.cos(lat)
+    so, co = math.sin(lon), math.cos(lon)
+    gs = R_EARTH * np.array([cl * co, cl * so, sl])
+    rho = sat - gs
+    rng = np.linalg.norm(rho, axis=-1)
+    east = np.array([-so, co, 0.0])
+    north = np.array([-sl * co, -sl * so, cl])
+    up = np.array([cl * co, cl * so, sl])
+    e = np.sum(rho * east, axis=-1)
+    n = np.sum(rho * north, axis=-1)
+    u = np.sum(rho * up, axis=-1)
+    az = np.degrees(np.arctan2(e, n)) % 360.0
+    el = np.degrees(np.arcsin(np.clip(u / rng, -1.0, 1.0)))
+    return az, el, rng
+
+
 class WalkerConstellation:
     """Chòm sao Walker (delta: RAAN trải 360°, star: trải 180°)."""
 
