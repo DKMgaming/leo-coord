@@ -91,6 +91,41 @@ versioned — **không hard-code trong mã nguồn**.
 Tài liệu API tương tác có tại `/docs` khi server đang chạy. Chi tiết thêm:
 `webapp/README.md`.
 
+## Hình ảnh ví dụ
+
+Ảnh chụp từ bản web app đang chạy với dữ liệu demo hư cấu (chòm sao
+DEMO_LEO_KU, hồ sơ DEMO-NGSO/GSO) — chỉ để minh họa chức năng.
+
+Tab 1 — bản đồ số 3D (CesiumJS, địa hình thật + ảnh nền vệ tinh), vệ tinh,
+quỹ đạo và lưới phủ sóng Việt Nam:
+
+![Bản đồ 3D](docs/images/tab1-ban-do-3d.png)
+
+Tab 1 — thẻ kết quả sau khi chạy đánh giá: phủ sóng tại 5 điểm tham chiếu,
+kiểm tra PFD (Article 21), sàng lọc EPFD (Article 22), phối hợp quốc tế
+và mốc Res 35:
+
+![Kết quả đánh giá](docs/images/tab1-ket-qua-danh-gia.png)
+
+Tab 1 — click vào quả cầu để tra cứu vệ tinh khả kiến tại điểm đó (góc
+ngấng, phương vị, cự ly theo thời gian mô phỏng):
+
+![Tra cứu vệ tinh khả kiến](docs/images/tab1-tra-cuu-ve-tinh.png)
+
+Tab 2 — tham luận & tài liệu đính kèm:
+
+![Tham luận và tài liệu](docs/images/tab2-tham-luan.png)
+
+Tab 3 — CSDL phối hợp quốc gia: hồ sơ đăng ký (kèm trường Appendix 4/SNS),
+trạng thái mốc Res 35, lịch sử triển khai, vụ việc phối hợp, nhập dữ liệu
+BR IFIC và đối chứng kết quả với BR:
+
+![CSDL phối hợp quốc gia](docs/images/tab3-csdl-phoi-hop.png)
+
+Báo cáo HTML do CLI xuất (`leo-coord assess --out ...`):
+
+![Báo cáo đánh giá HTML](docs/images/bao-cao-danh-gia.png)
+
 ## Lưu ý quan trọng
 
 - Đây là công cụ **hỗ trợ phân tích, sàng lọc**. Mọi kết luận cấp phép hay phối
@@ -215,8 +250,8 @@ Kiểm tra sau cài đặt: `.venv/bin/python -m pytest` (68 test phải qua) v�
 ### CLI
 
 ```bash
-.venv/bin/leo-coord assess --constellation data/demo/constellation_demo.yaml --report out/bao_cao.html
-.venv/bin/leo-coord coverage   # thống kê phủ sóng tại 3 điểm VN
+.venv/bin/leo-coord assess --constellation data/demo/constellation_demo.yaml --out out/bao_cao.html
+.venv/bin/leo-coord coverage   # thống kê phủ sóng tại 5 điểm VN
 .venv/bin/leo-coord pfd        # kiểm tra PFD Article 21
 .venv/bin/leo-coord epfd       # sàng lọc EPFD Article 22
 .venv/bin/leo-coord milestones # lịch & đánh giá mốc Res 35
@@ -261,3 +296,6 @@ tests/                kiểm thử pytest (engine + web app)
   triển khai thực tế, vụ việc phối hợp, mốc Res 35, xuất CSV); README viết lại.
   Bổ sung: nhập dữ liệu BR IFIC (CSV/.mdb SRS), trường hồ sơ Appendix 4
   (SNS ID, loại thông báo, số BR IFIC), đối chứng kết quả phối hợp với BR.
+  Thêm `requirements.txt` + `.python-version`. Sửa lỗi bản đồ 3D không hiển
+  thị địa cầu (Cesium ≥ 1.104 yêu cầu tạo ArcGIS terrain provider bằng
+  `fromUrl()`). Thêm mục Hình ảnh ví dụ (6 ảnh chụp từ bản đang chạy).

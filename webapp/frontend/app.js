@@ -145,12 +145,13 @@ async function initGlobe() {
     return;
   }
 
-  // địa hình thật (ArcGIS World Elevation) — rớt về ellipsoid nếu không có lớp này
+  // địa hình thật (ArcGIS World Elevation) — rớt về ellipsoid nếu không có lớp này.
+  // Cesium >= 1.104: provider này phải tạo bằng fromUrl() (bất đồng bộ);
+  // khởi tạo trực tiếp bằng new khiến địa cầu không hiển thị gì (lỗi đã sửa).
   let terrainProvider;
   try {
-    terrainProvider = new Cesium.ArcGISTiledElevationTerrainProvider({
-      url: "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer",
-    });
+    terrainProvider = await Cesium.ArcGISTiledElevationTerrainProvider.fromUrl(
+      "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer");
   } catch (err) {
     terrainProvider = new Cesium.EllipsoidTerrainProvider();
   }
