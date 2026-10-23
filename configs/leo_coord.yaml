@@ -3,13 +3,15 @@
 # Trạng thái: DỰ THẢO. Các bảng ITU/FCC sẽ được đối chiếu với văn bản chính thức
 # sau khi hoàn tất nghiên cứu quốc tế (xem docs/bao_cao_nghien_cuu.md).
 version: "0.1.0"
-updated: "2026-10-19"
+updated: "2026-10-23"
 verification_status: "index-sourced-2026-10-19"
 
 vietnam:
   bbox: {lat_min: 8.2, lat_max: 23.4, lon_min: 102.0, lon_max: 110.0}
   reference_points:
     hanoi: {lat: 21.0285, lon: 105.8542}
+    viettri: {lat: 21.3283, lon: 105.3566}
+    bacninh: {lat: 21.136356, lon: 106.074508}
     danang: {lat: 16.0544, lon: 108.2022}
     hcmc: {lat: 10.8231, lon: 106.6297}
 

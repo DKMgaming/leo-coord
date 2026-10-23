@@ -199,8 +199,10 @@ async function initGlobe() {
   const ecefToCart = p => new Cesium.Cartesian3(p[0] * 1000, p[1] * 1000, p[2] * 1000);
   const fracColor = f => new Cesium.Color(0.9 - 0.7 * f, 0.2 + 0.7 * f, 0.2, 0.9);
 
-  // Điểm tham chiếu Việt Nam
-  [["Hà Nội", 21.0285, 105.8542], ["Đà Nẵng", 16.0544, 108.2022],
+  // Điểm tham chiếu Việt Nam (khớp configs/leo_coord.yaml)
+  [["Hà Nội", 21.0285, 105.8542], ["Việt Trì", 21.3283, 105.3566],
+   ["KS vệ tinh Bắc Ninh", 21.136356, 106.074508],
+   ["Đà Nẵng", 16.0544, 108.2022],
    ["TP.HCM", 10.8231, 106.6297]].forEach(([name, la, lo]) => {
     viewer.entities.add({
       name,

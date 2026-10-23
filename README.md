@@ -19,7 +19,7 @@ Phần mềm gồm hai phần dùng chung một engine tính toán:
 | Module | Nội dung |
 |---|---|
 | `orbits.py` | Chòm sao Walker (star/delta), lan truyền quỹ đạo tròn, nạp TLE/SGP4; tính góc ngẩng, phương vị, cự ly trạm–vệ tinh |
-| `coverage.py` | Phân tích phủ sóng trên lưới lãnh thổ Việt Nam + 3 điểm tham chiếu (Hà Nội, Đà Nẵng, TP.HCM): tỉ lệ thời gian phủ, số vệ tinh trung bình, khoảng trống tối đa |
+| `coverage.py` | Phân tích phủ sóng trên lưới lãnh thổ Việt Nam + 5 điểm tham chiếu (Hà Nội, Việt Trì, Trạm Kiểm soát vệ tinh Bắc Ninh, Đà Nẵng, TP.HCM): tỉ lệ thời gian phủ, số vệ tinh trung bình, khoảng trống tối đa |
 | `pfd.py` | Kiểm tra PFD theo RR Article 21 (Table 21-4), gồm hệ số giảm X cho chòm sao lớn (≥51 vệ tinh) |
 | `epfd.py` | Sàng lọc EPFD đơn điểm theo RR Article 22 (đường bao S.465) — **chỉ là sàng lọc rút gọn, không thay thế phần mềm S.1503 của ITU BR** |
 | `coordination.py` | Xác định nhu cầu phối hợp: RR Article 9, cung Appendix 5, tiêu chí ΔT/T > 6% của Appendix 8 |
