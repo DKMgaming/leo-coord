@@ -24,7 +24,8 @@ Phần mềm gồm hai phần dùng chung một engine tính toán:
 | `epfd.py` | Sàng lọc EPFD đơn điểm theo RR Article 22 (đường bao S.465) — **chỉ là sàng lọc rút gọn, không thay thế phần mềm S.1503 của ITU BR** |
 | `coordination.py` | Xác định nhu cầu phối hợp: RR Article 9, cung Appendix 5, tiêu chí ΔT/T > 6% của Appendix 8 |
 | `milestones.py` | Mốc triển khai Res 35 (WRC-19, sửa đổi WRC-23): 10%/50%/100% tại +2/+5/+7 năm sau thời hạn 7 năm; lịch FCC; cảnh báo nguy cơ "xí phần" (warehousing) |
-| `database.py` | CSDL phối hợp tần số vệ tinh quốc gia (SQLite): hồ sơ đăng ký, triển khai thực tế, vụ việc phối hợp |
+| `database.py` | CSDL phối hợp tần số vệ tinh quốc gia (SQLite): hồ sơ đăng ký (kèm trường Appendix 4: SNS ID, loại thông báo, số BR IFIC, ngày BR nhận), triển khai thực tế, vụ việc phối hợp, bản ghi đối chứng với BR |
+| `brific.py` | Nhập dữ liệu hồ sơ từ nguồn ITU: file CSV trích từ SpaceQry/SpaceCap/Space Explorer hoặc file .mdb SRS của BR IFIC (ánh xạ cột SNS, chuẩn hóa trạng thái/ngày tháng) |
 | `report.py` | Xuất báo cáo đánh giá dạng HTML tiếng Việt |
 
 Mọi ngưỡng quy định (ITU/FCC) đều nằm trong `configs/leo_coord.yaml` dạng
@@ -62,6 +63,12 @@ versioned — **không hard-code trong mã nguồn**.
 - Bảng quản lý: danh sách hồ sơ (kèm số vệ tinh đã triển khai mới nhất), lịch
   sử triển khai, danh sách vụ việc, trạng thái mốc Res 35 từng hồ sơ, nút
   **xuất CSV**.
+- **Nhập dữ liệu BR IFIC**: tải lên file CSV trích từ SpaceQry/SpaceCap/
+  Space Explorer để nhập hàng loạt hồ sơ (file .mdb SRS nhập qua CLI).
+- **Đối chứng kết quả phối hợp**: ghi nhận kết luận chính thức của BR
+  (BR IFIC, SpaceQry/BR-SIS) và mức khớp với kết quả sàng lọc của leo_coord.
+- Trường hồ sơ căn chỉnh theo Appendix 4 / SpaceCap — xem
+  `docs/app4-spacecap-mapping.md`.
 - Dùng chung file SQLite `webapp/data/coord.db` với CLI (`leo-coord db ...`).
 
 ### API chính (FastAPI)
@@ -78,6 +85,8 @@ versioned — **không hard-code trong mã nguồn**.
 | `GET/POST /api/db/deployments` | Lịch sử / báo cáo triển khai thực tế |
 | `GET/POST /api/db/cases` | Danh sách / thêm vụ việc phối hợp |
 | `GET /api/db/milestones`, `GET /api/db/export.csv` | Trạng thái mốc Res 35; xuất CSV hồ sơ |
+| `GET/POST /api/db/crosschecks` | Bản ghi đối chứng kết quả phối hợp với BR |
+| `POST /api/db/import` | Nhập hồ sơ từ file CSV trích BR IFIC/SpaceQry/SpaceCap |
 
 Tài liệu API tương tác có tại `/docs` khi server đang chạy. Chi tiết thêm:
 `webapp/README.md`.
@@ -129,7 +138,7 @@ công cộng miễn phí); nếu không có mạng, các chức năng tính toá
 ## Kiểm thử
 
 ```bash
-.venv/bin/python -m pytest   # 61 test
+.venv/bin/python -m pytest   # 68 test
 ```
 
 ## Cấu trúc thư mục
@@ -152,3 +161,5 @@ tests/                kiểm thử pytest (engine + web app)
   CesiumJS (địa hình thật, chuyển lớp ảnh nền) + click tra cứu vệ tinh khả kiến.
 - **2026-10-23** — Thêm Tab 3: CSDL phối hợp quốc gia trên web (hồ sơ đăng ký,
   triển khai thực tế, vụ việc phối hợp, mốc Res 35, xuất CSV); README viết lại.
+  Bổ sung: nhập dữ liệu BR IFIC (CSV/.mdb SRS), trường hồ sơ Appendix 4
+  (SNS ID, loại thông báo, số BR IFIC), đối chứng kết quả phối hợp với BR.

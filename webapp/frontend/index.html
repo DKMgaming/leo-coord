@@ -134,7 +134,16 @@
           <label>Nghiêng (°)<input id="n_inc" type="number" step="0.1"></label>
           <label>Ngày API<input id="n_apidate" type="date"></label>
           <label>Hạn BIU (Res 35)<input id="n_biu" type="date"></label>
+          <label>SNS Notice ID<input id="n_sns" placeholder="VD: 110123"></label>
+          <label>Loại thông báo<input id="n_ntype" list="ntype-list" placeholder="API/A, CR/C..."></label>
+          <label>Số BR IFIC<input id="n_ific" placeholder="VD: 3082"></label>
+          <label>Ngày BR nhận<input id="n_rcv" type="date"></label>
         </div>
+        <datalist id="ntype-list">
+          <option value="API/A"></option><option value="CR/C"></option>
+          <option value="CR/D"></option><option value="CR/E"></option>
+          <option value="CR/F"></option><option value="NOTIFICATION"></option>
+        </datalist>
         <label>Ghi chú<input id="n_notes"></label>
         <button id="btn-filing" class="btn primary">＋ Thêm hồ sơ</button>
         <div id="filing-status" class="status"></div>
@@ -163,6 +172,38 @@
         <button id="btn-case" class="btn primary">＋ Thêm vụ việc</button>
         <div id="case-status" class="status"></div>
       </div>
+      <div class="card">
+        <h2>Nhập dữ liệu BR IFIC</h2>
+        <p class="hint">Nhập hàng loạt hồ sơ từ file CSV trích từ SpaceQry / SpaceCap /
+        ITU Space Explorer (cột tương thích SNS). File .mdb của SRS (trên BR IFIC DVD)
+        nhập bằng CLI: <code>leo-coord db import-brific</code>.</p>
+        <label>File CSV <input id="imp_file" type="file" accept=".csv,.txt,.tsv"></label>
+        <button id="btn-import" class="btn primary">⬆ Nhập dữ liệu</button>
+        <div id="import-status" class="status"></div>
+      </div>
+      <div class="card">
+        <h2>Đối chứng kết quả phối hợp</h2>
+        <p class="hint">Ghi nhận kết quả chính thức của BR (BR IFIC, SpaceQry/BR-SIS)
+        và so khớp với kết quả sàng lọc của leo_coord.</p>
+        <label>Mạng vệ tinh <select id="cc_net"></select></label>
+        <label>Hệ thống liên quan *<input id="cc_other" placeholder="VD: GSO-KU-105E"></label>
+        <label>Kết quả sàng lọc (leo_coord)<input id="cc_our" placeholder="VD: Cần phối hợp: cung ±6°, ΔT/T 8,2%"></label>
+        <label>Nguồn chính thức<input id="cc_source" placeholder="VD: BR IFIC 3082 (CR/C)"></label>
+        <label>Kết luận chính thức<input id="cc_official" placeholder="VD: BR xác nhận cần phối hợp"></label>
+        <div class="fgrid">
+          <label>Mức khớp
+            <select id="cc_agree">
+              <option value="KHOP">Khớp</option>
+              <option value="LECH">Lệch</option>
+              <option value="CHUA_RO">Chưa rõ</option>
+            </select></label>
+          <label>Ngày đối chứng<input id="cc_date" type="date"></label>
+        </div>
+        <label>Người đối chứng<input id="cc_checker"></label>
+        <label>Ghi chú<input id="cc_notes"></label>
+        <button id="btn-cc" class="btn primary">＋ Ghi nhận đối chứng</button>
+        <div id="cc-status" class="status"></div>
+      </div>
     </div>
     <div class="db-main">
       <div class="card">
@@ -188,6 +229,14 @@
           <thead><tr><th>Mạng</th><th>Hệ thống liên quan</th><th>Băng tần</th>
           <th>Kích hoạt</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
           <tbody id="cases-body"><tr><td colspan="6" class="hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Lịch sử đối chứng với BR</h2>
+        <table class="docs">
+          <thead><tr><th>Mạng ↔ Hệ thống</th><th>Sàng lọc leo_coord</th>
+          <th>Kết luận BR</th><th>Khớp</th><th>Ngày</th></tr></thead>
+          <tbody id="cc-body"><tr><td colspan="5" class="hint">Đang tải…</td></tr></tbody>
         </table>
       </div>
       <p class="hint">Dữ liệu nằm trong CSDL SQLite dùng chung với CLI (<code>leo-coord db ...</code>),

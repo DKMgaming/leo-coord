@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS filings (
   status TEXT DEFAULT 'API',
   api_date TEXT,
   biu_deadline TEXT,
+  sns_id TEXT,
+  notice_type TEXT,
+  ific_no TEXT,
+  receipt_date TEXT,
   notes TEXT
 );
 CREATE TABLE IF NOT EXISTS deployments (
@@ -44,9 +48,28 @@ CREATE TABLE IF NOT EXISTS coordination_cases (
   status TEXT DEFAULT 'MO',
   notes TEXT
 );
+CREATE TABLE IF NOT EXISTS cross_checks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  filing_id INTEGER NOT NULL REFERENCES filings(id),
+  other_system TEXT NOT NULL,
+  our_result TEXT,
+  official_source TEXT,
+  official_result TEXT,
+  agreement TEXT DEFAULT 'CHUA_RO',
+  checked_date TEXT,
+  checker TEXT,
+  notes TEXT
+);
 """
 
 VALID_STATUS = {"API", "COORDINATION", "NOTIFICATION", "MIFR", "BIU"}
+VALID_AGREEMENT = {"KHOP", "LECH", "CHUA_RO"}
+
+# Cột bổ sung theo Appendix 4 / SpaceCap cho CSDL tạo từ phiên bản cũ
+_FILING_EXTRA_COLUMNS = {
+    "sns_id": "TEXT", "notice_type": "TEXT",
+    "ific_no": "TEXT", "receipt_date": "TEXT",
+}
 
 
 def init_db(path) -> Path:
@@ -54,6 +77,11 @@ def init_db(path) -> Path:
     p.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(p) as c:
         c.executescript(SCHEMA)
+        # migration: thêm cột App4 còn thiếu vào bảng filings cũ (idempotent)
+        cols = {r[1] for r in c.execute("PRAGMA table_info(filings)")}
+        for name, typ in _FILING_EXTRA_COLUMNS.items():
+            if name not in cols:
+                c.execute(f"ALTER TABLE filings ADD COLUMN {name} {typ}")
     return p
 
 
@@ -65,16 +93,20 @@ def _connect(path):
 
 def add_filing(path, *, network_name, administration, n_sats_filed,
                operator="", bands="", alt_km=None, inc_deg=None,
-               status="API", api_date=None, biu_deadline=None, notes="") -> int:
+               status="API", api_date=None, biu_deadline=None, notes="",
+               sns_id="", notice_type="", ific_no="",
+               receipt_date=None) -> int:
     if status not in VALID_STATUS:
         raise ValueError(f"status phải thuộc {sorted(VALID_STATUS)}")
     with _connect(path) as c:
         cur = c.execute(
             """INSERT INTO filings (network_name, administration, operator, bands,
-               n_sats_filed, alt_km, inc_deg, status, api_date, biu_deadline, notes)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+               n_sats_filed, alt_km, inc_deg, status, api_date, biu_deadline,
+               sns_id, notice_type, ific_no, receipt_date, notes)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (network_name, administration, operator, bands, n_sats_filed,
-             alt_km, inc_deg, status, api_date, biu_deadline, notes))
+             alt_km, inc_deg, status, api_date, biu_deadline,
+             sns_id, notice_type, ific_no, receipt_date, notes))
         return cur.lastrowid
 
 
@@ -155,6 +187,42 @@ def milestone_status(path, today: date = None) -> list:
                            for d in deps], today)
             out.append({"network_name": f["network_name"], "milestones": ev})
     return out
+
+
+def add_cross_check(path, network_name, other_system, our_result="",
+                    official_source="", official_result="",
+                    agreement="CHUA_RO", checked_date=None, checker="",
+                    notes="") -> int:
+    """Ghi nhận một lần đối chứng kết quả sàng lọc của leo_coord với
+    kết quả chính thức của BR (BR IFIC / SpaceQry / BR-SIS)."""
+    if agreement not in VALID_AGREEMENT:
+        raise ValueError(f"agreement phải thuộc {sorted(VALID_AGREEMENT)}")
+    with _connect(path) as c:
+        row = c.execute("SELECT id FROM filings WHERE network_name=?",
+                        (network_name,)).fetchone()
+        if row is None:
+            raise ValueError(f"Không tìm thấy hồ sơ '{network_name}'")
+        cur = c.execute(
+            """INSERT INTO cross_checks
+               (filing_id, other_system, our_result, official_source,
+                official_result, agreement, checked_date, checker, notes)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            (row["id"], other_system, our_result, official_source,
+             official_result, agreement, checked_date, checker, notes))
+        return cur.lastrowid
+
+
+def list_cross_checks(path, network_name=None) -> list:
+    """Danh sách đối chứng (kèm tên mạng), mới nhất trước."""
+    q = """SELECT cc.*, f.network_name FROM cross_checks cc
+           JOIN filings f ON cc.filing_id = f.id"""
+    with _connect(path) as c:
+        if network_name:
+            rows = c.execute(q + " WHERE f.network_name=? ORDER BY cc.id DESC",
+                             (network_name,))
+        else:
+            rows = c.execute(q + " ORDER BY cc.id DESC")
+        return [dict(r) for r in rows]
 
 
 def export_filings_csv(path, csv_path) -> Path:

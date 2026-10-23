@@ -116,6 +116,47 @@ def test_db_flow(client):
     assert csv_r.status_code == 200 and "VN-TEST-1" in csv_r.text
 
 
+def test_db_app4_crosscheck_import(client):
+    # hồ sơ kèm trường Appendix 4 / SpaceCap
+    filing = {"network_name": "VN-APP4-1", "administration": "VTN",
+              "n_sats_filed": 100, "sns_id": "110123",
+              "notice_type": "CR/C", "ific_no": "3082",
+              "receipt_date": "2026-09-15"}
+    assert client.post("/api/db/filings", json=filing).status_code == 200
+    row = client.get("/api/db/filings").json()["filings"][0]
+    assert row["sns_id"] == "110123" and row["notice_type"] == "CR/C"
+    assert row["ific_no"] == "3082" and row["receipt_date"] == "2026-09-15"
+    # đối chứng với BR
+    cc = {"network_name": "VN-APP4-1", "other_system": "GSO-KU-105E",
+          "our_result": "Cần phối hợp", "official_source": "BR IFIC 3082",
+          "official_result": "BR xác nhận cần phối hợp",
+          "agreement": "KHOP", "checked_date": "2026-10-23"}
+    assert client.post("/api/db/crosschecks", json=cc).status_code == 200
+    xs = client.get("/api/db/crosschecks").json()["crosschecks"]
+    assert len(xs) == 1 and xs[0]["agreement"] == "KHOP"
+    bad = {**cc, "agreement": "SAI"}
+    assert client.post("/api/db/crosschecks", json=bad).status_code == 400
+    # nhập BR IFIC qua CSV (dữ liệu hư cấu)
+    csv_data = ("SAT_NAME,ADM,N_SATS,STAGE,NTC_ID\n"
+                "DEMO-WEB-1,VTN,10,API/A,110200\n"
+                "DEMO-WEB-2,USA,5,CR/C,110201\n")
+    r = client.post("/api/db/import",
+                    files={"file": ("extract.csv", csv_data.encode(),
+                                    "text/csv")})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["stats"]["added"] == 2
+    assert "network_name" in d["report"]["fields_mapped"]
+    names = [f["network_name"]
+             for f in client.get("/api/db/filings").json()["filings"]]
+    assert "DEMO-WEB-1" in names and "VN-APP4-1" in names
+    # từ chối đuôi file không phải CSV
+    bad_r = client.post("/api/db/import",
+                        files={"file": ("srs.mdb", b"x",
+                                        "application/octet-stream")})
+    assert bad_r.status_code == 400
+
+
 def test_docs_flow(client):
     # upload
     r = client.post("/api/docs",

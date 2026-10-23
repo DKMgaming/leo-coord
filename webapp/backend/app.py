@@ -335,6 +335,10 @@ def db_add_filing(body: dict):
             status=str(body.get("status", "API") or "API"),
             api_date=body.get("api_date") or None,
             biu_deadline=body.get("biu_deadline") or None,
+            sns_id=str(body.get("sns_id", "") or ""),
+            notice_type=str(body.get("notice_type", "") or ""),
+            ific_no=str(body.get("ific_no", "") or ""),
+            receipt_date=body.get("receipt_date") or None,
             notes=str(body.get("notes", "") or ""))
     except sqlite3.IntegrityError:
         raise HTTPException(400, "Tên mạng vệ tinh đã tồn tại trong CSDL")
@@ -390,6 +394,57 @@ def db_milestones():
         ms = [{**m, "due": m["due"].isoformat()} for m in item["milestones"]]
         out.append({"network_name": item["network_name"], "milestones": ms})
     return {"networks": out}
+
+
+@app.get("/api/db/crosschecks")
+def db_list_crosschecks():
+    return {"crosschecks": coorddb.list_cross_checks(_coord_path())}
+
+
+@app.post("/api/db/crosschecks")
+def db_add_crosscheck(body: dict):
+    try:
+        xid = coorddb.add_cross_check(
+            _coord_path(), str(body["network_name"]),
+            str(body["other_system"]),
+            our_result=str(body.get("our_result", "") or ""),
+            official_source=str(body.get("official_source", "") or ""),
+            official_result=str(body.get("official_result", "") or ""),
+            agreement=str(body.get("agreement", "CHUA_RO") or "CHUA_RO"),
+            checked_date=body.get("checked_date") or None,
+            checker=str(body.get("checker", "") or ""),
+            notes=str(body.get("notes", "") or ""))
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return {"id": xid}
+
+
+@app.post("/api/db/import")
+async def db_import_brific(file: UploadFile = File(...)):
+    """Nhập hồ sơ từ file CSV trích từ BR IFIC/SpaceQry/SpaceCap (tối đa 20 MB)."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in (".csv", ".txt", ".tsv"):
+        raise HTTPException(
+            400, "Bản web chỉ nhận file .csv trích từ SpaceQry/SpaceCap; "
+                 "file .mdb (SRS) hãy nhập bằng CLI: leo-coord db import-brific")
+    tmp = DATA / f"import_{uuid.uuid4().hex}.csv"
+    size = 0
+    with tmp.open("wb") as fh:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > 20 * 1024 * 1024:
+                tmp.unlink(missing_ok=True)
+                raise HTTPException(413, "File vượt quá 20 MB")
+            fh.write(chunk)
+    try:
+        from leo_coord.brific import import_file
+        stats, report = import_file(_coord_path(), tmp,
+                                    source_label=file.filename)
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(400, str(e))
+    finally:
+        tmp.unlink(missing_ok=True)
+    return {"stats": stats, "report": report}
 
 
 @app.get("/api/db/export.csv")

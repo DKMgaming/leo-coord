@@ -74,6 +74,49 @@ def test_list_deployments(dbpath):
     assert db.list_deployments(dbpath, "KHONG_CO") == []
 
 
+def test_migration_from_old_schema(tmp_path):
+    import sqlite3
+    p = tmp_path / "old.db"
+    with sqlite3.connect(p) as c:
+        c.execute("""CREATE TABLE filings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, network_name TEXT UNIQUE NOT NULL,
+          administration TEXT NOT NULL, operator TEXT, bands TEXT,
+          n_sats_filed INTEGER NOT NULL, alt_km REAL, inc_deg REAL,
+          status TEXT DEFAULT 'API', api_date TEXT, biu_deadline TEXT,
+          notes TEXT)""")
+        c.execute("INSERT INTO filings (network_name, administration,"
+                  " n_sats_filed) VALUES ('OLD-1', 'VTN', 10)")
+    db.init_db(str(p))  # phải tự thêm cột App4 + bảng cross_checks
+    rows = db.list_filings(str(p))
+    assert rows[0]["network_name"] == "OLD-1"
+    assert rows[0]["sns_id"] is None
+    db.add_filing(str(p), network_name="NEW-1", administration="VTN",
+                  n_sats_filed=5, sns_id="110999", notice_type="CR/C",
+                  ific_no="3082", receipt_date="2026-09-15")
+    by_name = {f["network_name"]: f for f in db.list_filings(str(p))}
+    assert by_name["NEW-1"]["sns_id"] == "110999"
+    assert by_name["NEW-1"]["notice_type"] == "CR/C"
+
+
+def test_cross_checks(dbpath):
+    db.add_filing(dbpath, network_name="VN-LEO-1", administration="VTN",
+                  n_sats_filed=100)
+    xid = db.add_cross_check(
+        dbpath, "VN-LEO-1", "GSO-KU-105E",
+        our_result="Cần phối hợp: cung ±6°, ΔT/T 8,2%",
+        official_source="BR IFIC 3082 (CR/C)",
+        official_result="BR xác nhận cần phối hợp với GSO-KU-105E",
+        agreement="KHOP", checked_date="2026-10-20", checker="P.HTQT")
+    assert xid == 1
+    rows = db.list_cross_checks(dbpath)
+    assert len(rows) == 1 and rows[0]["network_name"] == "VN-LEO-1"
+    assert rows[0]["agreement"] == "KHOP"
+    with pytest.raises(ValueError):
+        db.add_cross_check(dbpath, "VN-LEO-1", "X", agreement="SAI")
+    with pytest.raises(ValueError):
+        db.add_cross_check(dbpath, "KHONG_CO", "X")
+
+
 def test_export_csv(dbpath, tmp_path):
     db.add_filing(dbpath, network_name="VN-LEO-1", administration="VTN",
                   n_sats_filed=100)

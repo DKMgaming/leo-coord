@@ -178,8 +178,32 @@ def cmd_db(args):
             n_sats_filed=args.n_sats, operator=args.operator, bands=args.bands,
             alt_km=args.alt, inc_deg=args.inc, status=args.status,
             api_date=args.api_date, biu_deadline=args.biu_deadline,
-            notes=args.notes)
+            notes=args.notes, sns_id=args.sns_id,
+            notice_type=args.notice_type, ific_no=args.ific_no,
+            receipt_date=args.receipt_date)
         print(f"Đã thêm hồ sơ id={fid}")
+    elif args.db_cmd == "import-brific":
+        from .brific import import_file
+        stats, report = import_file(args.db, args.file)
+        print(f"Đọc {report['n_rows']} dòng; cột khớp: "
+              f"{', '.join(report['fields_mapped']) or '(không có)'}")
+        print(f"Đã nhập mới: {stats['added']}; bỏ qua (đã có): "
+              f"{stats['skipped_existing']}; bỏ qua (thiếu tên): "
+              f"{report['n_skipped_no_name']}")
+        for e in stats["errors"]:
+            print(f"  LỖI: {e}")
+    elif args.db_cmd == "add-crosscheck":
+        xid = db.add_cross_check(
+            args.db, args.name, args.other, our_result=args.our_result,
+            official_source=args.official_source,
+            official_result=args.official_result, agreement=args.agreement,
+            checked_date=args.date, checker=args.checker, notes=args.notes)
+        print(f"Đã ghi nhận đối chứng id={xid}")
+    elif args.db_cmd == "list-crosschecks":
+        for x in db.list_cross_checks(args.db, args.name):
+            print(f"{x['id']} | {x['network_name']} <-> {x['other_system']} | "
+                  f"{x['agreement']} | {x['official_source']} | "
+                  f"{x['checked_date']}")
     elif args.db_cmd == "report-deployment":
         did = db.report_deployment(args.db, args.name, args.date, args.n,
                                    args.source)
@@ -225,7 +249,7 @@ def build_parser():
     a.add_argument("--json-out", default=None)
     a.set_defaults(func=cmd_assess)
 
-    c = sub.add_parser("coverage", help="Thống kê phủ sóng tại 3 điểm VN")
+    c = sub.add_parser("coverage", help="Thống kê phủ sóng tại các điểm tham chiếu VN")
     c.add_argument("--constellation", required=True)
     c.set_defaults(func=cmd_coverage)
 
@@ -264,6 +288,20 @@ def build_parser():
     af.add_argument("--alt", type=float, default=None); af.add_argument("--inc", type=float, default=None)
     af.add_argument("--status", default="API"); af.add_argument("--api-date", default=None)
     af.add_argument("--biu-deadline", default=None); af.add_argument("--notes", default="")
+    af.add_argument("--sns-id", default=""); af.add_argument("--notice-type", default="")
+    af.add_argument("--ific-no", default=""); af.add_argument("--receipt-date", default=None)
+    ib = dsub.add_parser("import-brific"); ib.add_argument("--db", required=True)
+    ib.add_argument("--file", required=True,
+                    help="File .csv trích từ SpaceQry/SpaceCap hoặc .mdb (SRS)")
+    xc = dsub.add_parser("add-crosscheck"); xc.add_argument("--db", required=True)
+    xc.add_argument("--name", required=True); xc.add_argument("--other", required=True)
+    xc.add_argument("--our-result", default=""); xc.add_argument("--official-source", default="")
+    xc.add_argument("--official-result", default="")
+    xc.add_argument("--agreement", default="CHUA_RO", choices=["KHOP", "LECH", "CHUA_RO"])
+    xc.add_argument("--date", default=None); xc.add_argument("--checker", default="")
+    xc.add_argument("--notes", default="")
+    lx = dsub.add_parser("list-crosschecks"); lx.add_argument("--db", required=True)
+    lx.add_argument("--name", default=None)
     rd = dsub.add_parser("report-deployment"); rd.add_argument("--db", required=True)
     rd.add_argument("--name", required=True); rd.add_argument("--date", required=True)
     rd.add_argument("--n", type=int, required=True); rd.add_argument("--source", default="")

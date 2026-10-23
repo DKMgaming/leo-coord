@@ -458,7 +458,7 @@ async function postDb(url, payload) {
 }
 
 function fillNetSelects(names) {
-  ["dep_net", "case_net"].forEach(id => {
+  ["dep_net", "case_net", "cc_net"].forEach(id => {
     const sel = $(id), cur = sel.value;
     sel.innerHTML = names.map(n =>
       `<option value="${esc(n)}">${esc(n)}</option>`).join("");
@@ -473,28 +473,46 @@ function latestDeployed(deployments, name) {
 
 async function loadDb() {
   try {
-    const [f, d, c, m] = await Promise.all([
+    const [f, d, c, m, x] = await Promise.all([
       fetch("/api/db/filings").then(r => r.json()),
       fetch("/api/db/deployments").then(r => r.json()),
       fetch("/api/db/cases").then(r => r.json()),
       fetch("/api/db/milestones").then(r => r.json()),
+      fetch("/api/db/crosschecks").then(r => r.json()),
     ]);
-    renderDb(f.filings, d.deployments, c.cases, m.networks);
+    renderDb(f.filings, d.deployments, c.cases, m.networks, x.crosschecks);
   } catch (e) {
     $("filings-body").innerHTML =
       `<tr><td colspan="8" class="hint">Lỗi tải CSDL: ${esc(e.message)}</td></tr>`;
   }
 }
 
-function renderDb(filings, deployments, cases, networks) {
+function renderDb(filings, deployments, cases, networks, crosschecks) {
   $("filing-count").textContent = filings.length;
   fillNetSelects(filings.map(f => f.network_name));
-  $("filings-body").innerHTML = filings.length ? filings.map(f => `<tr>
-    <td><b>${esc(f.network_name)}</b></td><td>${esc(f.administration)}</td>
+  $("filings-body").innerHTML = filings.length ? filings.map(f => {
+    const sub = [f.sns_id && "SNS " + f.sns_id, f.notice_type,
+                 f.ific_no && "IFIC " + f.ific_no].filter(Boolean).join(" · ");
+    return `<tr>
+    <td><b>${esc(f.network_name)}</b>${sub ? `<div class="desc">${esc(sub)}</div>` : ""}</td>
+    <td>${esc(f.administration)}</td>
     <td>${esc(f.operator || "")}</td><td>${esc(f.bands || "")}</td>
     <td>${f.n_sats_filed}</td><td>${latestDeployed(deployments, f.network_name)}</td>
-    <td>${esc(f.status || "")}</td><td>${esc(f.biu_deadline || "—")}</td></tr>`).join("")
+    <td>${esc(f.status || "")}</td><td>${esc(f.biu_deadline || "—")}</td></tr>`;
+  }).join("")
     : `<tr><td colspan="8" class="hint">Chưa có hồ sơ nào.</td></tr>`;
+
+  const AGREE = {KHOP: ["KHỚP", "ok"], LECH: ["LỆCH", "bad"],
+                 CHUA_RO: ["CHƯA RÕ", "warn"]};
+  $("cc-body").innerHTML = crosschecks.length ? crosschecks.map(x => {
+    const [txt, cls] = AGREE[x.agreement] || ["?", ""];
+    return `<tr><td><b>${esc(x.network_name)}</b>
+      <div class="desc">↔ ${esc(x.other_system)}</div></td>
+      <td>${esc(x.our_result || "")}<div class="desc">${esc(x.official_source || "")}</div></td>
+      <td>${esc(x.official_result || "")}</td>
+      <td>${badge(txt, cls)}</td><td>${esc(x.checked_date || "")}</td></tr>`;
+  }).join("")
+    : `<tr><td colspan="5" class="hint">Chưa có bản ghi đối chứng nào.</td></tr>`;
 
   $("deployments-body").innerHTML = deployments.length ? deployments.map(d => `<tr>
     <td>${esc(d.network_name)}</td><td>${esc(d.report_date)}</td>
@@ -532,6 +550,10 @@ $("btn-filing").addEventListener("click", async () => {
       status: $("n_status").value,
       api_date: $("n_apidate").value || null,
       biu_deadline: $("n_biu").value || null,
+      sns_id: $("n_sns").value.trim(),
+      notice_type: $("n_ntype").value.trim(),
+      ific_no: $("n_ific").value.trim(),
+      receipt_date: $("n_rcv").value || null,
       notes: $("n_notes").value.trim(),
     });
     st.textContent = "Đã thêm hồ sơ.";
@@ -569,8 +591,49 @@ $("btn-case").addEventListener("click", async () => {
   } catch (e) { st.textContent = "Lỗi: " + e.message; }
 });
 
+$("btn-import").addEventListener("click", async () => {
+  const st = $("import-status");
+  const file = $("imp_file").files[0];
+  if (!file) { st.textContent = "Hãy chọn file CSV."; return; }
+  st.textContent = "Đang nhập…";
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/db/import", {method: "POST", body: fd});
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.detail || ("Lỗi " + r.status));
+    }
+    const d = await r.json();
+    st.textContent = `Đã nhập mới ${d.stats.added} hồ sơ; bỏ qua ` +
+      `${d.stats.skipped_existing} (đã có), ${d.report.n_skipped_no_name} (thiếu tên). ` +
+      `Cột khớp: ${d.report.fields_mapped.join(", ") || "không có"}.`;
+    loadDb();
+  } catch (e) { st.textContent = "Lỗi: " + e.message; }
+});
+
+$("btn-cc").addEventListener("click", async () => {
+  const st = $("cc-status");
+  try {
+    await postDb("/api/db/crosschecks", {
+      network_name: $("cc_net").value,
+      other_system: $("cc_other").value.trim(),
+      our_result: $("cc_our").value.trim(),
+      official_source: $("cc_source").value.trim(),
+      official_result: $("cc_official").value.trim(),
+      agreement: $("cc_agree").value,
+      checked_date: $("cc_date").value || null,
+      checker: $("cc_checker").value.trim(),
+      notes: $("cc_notes").value.trim(),
+    });
+    st.textContent = "Đã ghi nhận đối chứng.";
+    loadDb();
+  } catch (e) { st.textContent = "Lỗi: " + e.message; }
+});
+
 /* ---------------- khởi động ---------------- */
 $("dep_date").value = new Date().toISOString().slice(0, 10);
+$("cc_date").value = new Date().toISOString().slice(0, 10);
 loadDocs();
 loadDb();
 initGlobe();

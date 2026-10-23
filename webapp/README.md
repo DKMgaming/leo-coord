@@ -1,7 +1,7 @@
 # Web app leo_coord
 
 Giao diện web cho phần mềm `leo_coord` — chạy trên cùng engine Python đã kiểm thử
-(61 test pytest), không tính lại bằng JavaScript.
+(68 test pytest), không tính lại bằng JavaScript.
 
 ## Ba tab chính
 
@@ -16,11 +16,15 @@ Giao diện web cho phần mềm `leo_coord` — chạy trên cùng engine Pytho
   Word (.doc/.docx), Excel (.xls/.xlsx), PDF (.pdf), PowerPoint (.ppt/.pptx),
   tối đa 50 MB/file. File lưu tại `webapp/data/uploads/`, metadata tại
   `webapp/data/thamluan.db`.
-- **Tab 3 — CSDL phối hợp quốc gia:** nhập và quản lý hồ sơ đăng ký mạng vệ tinh,
-  báo cáo triển khai thực tế, vụ việc phối hợp quốc tế; xem trạng thái mốc
-  Res 35 của từng hồ sơ và xuất danh sách hồ sơ ra CSV. Dữ liệu nằm trong
-  SQLite `webapp/data/coord.db` — **dùng chung với CLI** (`leo-coord db ...`)
-  nên nhập ở web thì xem được ở CLI và ngược lại.
+- **Tab 3 — CSDL phối hợp quốc gia:** nhập và quản lý hồ sơ đăng ký mạng vệ tinh
+  (kèm trường Appendix 4: SNS Notice ID, loại thông báo, số BR IFIC, ngày BR
+  nhận), báo cáo triển khai thực tế, vụ việc phối hợp quốc tế; xem trạng thái
+  mốc Res 35 của từng hồ sơ và xuất danh sách hồ sơ ra CSV. Có mục **nhập dữ
+  liệu BR IFIC** (file CSV trích từ SpaceQry/SpaceCap/Space Explorer; file
+  .mdb SRS nhập qua CLI) và mục **đối chứng kết quả phối hợp** (ghi nhận kết
+  luận chính thức của BR, so khớp với sàng lọc của leo_coord). Dữ liệu nằm
+  trong SQLite `webapp/data/coord.db` — **dùng chung với CLI**
+  (`leo-coord db ...`) nên nhập ở web thì xem được ở CLI và ngược lại.
 
 ## Chạy
 
@@ -41,6 +45,7 @@ và địa hình ArcGIS là dịch vụ công cộng miễn phí, cần mạng �
 - `backend/app.py` — FastAPI: `/api/assess`, `/api/tracks`, `/api/coverage-map`,
   `/api/visible-sats`, `/api/docs` (GET/POST), `/api/docs/{id}/download`,
   `/api/docs/{id}` (DELETE), `/api/db/filings`, `/api/db/deployments`,
-  `/api/db/cases`, `/api/db/milestones`, `/api/db/export.csv`
+  `/api/db/cases`, `/api/db/milestones`, `/api/db/export.csv`,
+  `/api/db/crosschecks`, `/api/db/import`
 - `frontend/` — `index.html`, `styles.css`, `app.js` (CesiumJS)
 - `data/` — uploads + SQLite (tạo tự động khi chạy)
