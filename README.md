@@ -9,8 +9,10 @@ Phần mềm gồm hai phần dùng chung một engine tính toán:
 
 1. **Engine + CLI** — mô hình chòm sao, phân tích phủ sóng, kiểm tra PFD/EPFD,
    sàng lọc phối hợp quốc tế, theo dõi mốc triển khai, CSDL phối hợp quốc gia.
-2. **Web app 2 tab** — Tab 1: các chức năng chính + **bản đồ số 3D (CesiumJS)**;
-   Tab 2: tham luận & tài liệu đính kèm (Word/Excel/PDF/PowerPoint).
+2. **Web app 3 tab** — Tab 1: các chức năng chính + **bản đồ số 3D (CesiumJS)**;
+   Tab 2: tham luận & tài liệu đính kèm (Word/Excel/PDF/PowerPoint);
+   Tab 3: CSDL phối hợp tần số vệ tinh quốc gia (hồ sơ đăng ký, triển khai
+   thực tế, vụ việc phối hợp).
 
 ## Chức năng engine
 
@@ -51,6 +53,17 @@ versioned — **không hard-code trong mã nguồn**.
   `.xls`, `.xlsx`, `.pdf`, `.ppt`, `.pptx` (tối đa 50 MB/file).
 - Lưu trữ tại `webapp/data/` (không đưa lên git).
 
+### Tab 3 — CSDL phối hợp quốc gia
+
+- Form nhập **hồ sơ đăng ký** (tên mạng, cơ quan đăng ký, nhà khai thác, băng
+  tần, số vệ tinh, trạng thái API/COORDINATION/NOTIFICATION/MIFR/BIU, hạn BIU),
+  **báo cáo triển khai thực tế** theo ngày, và **vụ việc phối hợp** với hệ
+  thống khác.
+- Bảng quản lý: danh sách hồ sơ (kèm số vệ tinh đã triển khai mới nhất), lịch
+  sử triển khai, danh sách vụ việc, trạng thái mốc Res 35 từng hồ sơ, nút
+  **xuất CSV**.
+- Dùng chung file SQLite `webapp/data/coord.db` với CLI (`leo-coord db ...`).
+
 ### API chính (FastAPI)
 
 | Endpoint | Mô tả |
@@ -61,6 +74,10 @@ versioned — **không hard-code trong mã nguồn**.
 | `POST /api/coverage-map` | Lưới phủ sóng cho lớp overlay |
 | `POST /api/visible-sats` | Vệ tinh khả kiến tại điểm + thời điểm chỉ định |
 | `GET/POST /api/docs`, `GET /api/docs/{id}/download`, `DELETE /api/docs/{id}` | Quản lý tài liệu tham luận |
+| `GET/POST /api/db/filings` | Danh sách / thêm hồ sơ đăng ký |
+| `GET/POST /api/db/deployments` | Lịch sử / báo cáo triển khai thực tế |
+| `GET/POST /api/db/cases` | Danh sách / thêm vụ việc phối hợp |
+| `GET /api/db/milestones`, `GET /api/db/export.csv` | Trạng thái mốc Res 35; xuất CSV hồ sơ |
 
 Tài liệu API tương tác có tại `/docs` khi server đang chạy. Chi tiết thêm:
 `webapp/README.md`.
@@ -112,7 +129,7 @@ công cộng miễn phí); nếu không có mạng, các chức năng tính toá
 ## Kiểm thử
 
 ```bash
-.venv/bin/python -m pytest   # 59 test
+.venv/bin/python -m pytest   # 61 test
 ```
 
 ## Cấu trúc thư mục
@@ -133,3 +150,5 @@ tests/                kiểm thử pytest (engine + web app)
 - **2026-10-19** — Engine + CLI (8 module), báo cáo nghiên cứu quốc tế.
 - **2026-10-20** — Web app 2 tab (FastAPI + bản đồ 3D); nâng cấp bản đồ lên
   CesiumJS (địa hình thật, chuyển lớp ảnh nền) + click tra cứu vệ tinh khả kiến.
+- **2026-10-23** — Thêm Tab 3: CSDL phối hợp quốc gia trên web (hồ sơ đăng ký,
+  triển khai thực tế, vụ việc phối hợp, mốc Res 35, xuất CSV); README viết lại.

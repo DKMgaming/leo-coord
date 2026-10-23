@@ -80,6 +80,42 @@ def test_coverage_map(client):
     assert all(0.0 <= c["fraction"] <= 1.0 for c in cells)
 
 
+def test_db_flow(client):
+    filing = {"network_name": "VN-TEST-1", "administration": "VTN",
+              "operator": "DemoSat", "bands": "10.7-12.7 GHz",
+              "n_sats_filed": 648, "alt_km": 550, "inc_deg": 53,
+              "status": "COORDINATION", "biu_deadline": "2024-03-01"}
+    r = client.post("/api/db/filings", json=filing)
+    assert r.status_code == 200 and r.json()["id"] >= 1
+    # trùng tên -> 400; trạng thái sai -> 400
+    assert client.post("/api/db/filings", json=filing).status_code == 400
+    bad = {**filing, "network_name": "VN-TEST-2", "status": "SAI"}
+    assert client.post("/api/db/filings", json=bad).status_code == 400
+    # danh sách hồ sơ
+    rows = client.get("/api/db/filings").json()["filings"]
+    assert [f["network_name"] for f in rows] == ["VN-TEST-1"]
+    # báo cáo triển khai
+    dep = {"network_name": "VN-TEST-1", "report_date": "2025-06-01",
+           "n_deployed": 70, "source": "test"}
+    assert client.post("/api/db/deployments", json=dep).status_code == 200
+    deps = client.get("/api/db/deployments").json()["deployments"]
+    assert len(deps) == 1 and deps[0]["n_deployed"] == 70
+    unk = {**dep, "network_name": "KHONG_CO"}
+    assert client.post("/api/db/deployments", json=unk).status_code == 400
+    # vụ việc phối hợp
+    case = {"network_name": "VN-TEST-1", "other_system": "GSO-KU-105E",
+            "band": "10.7-12.7 GHz", "trigger": "cung ±6°", "status": "MO"}
+    assert client.post("/api/db/cases", json=case).status_code == 200
+    cases = client.get("/api/db/cases").json()["cases"]
+    assert len(cases) == 1 and cases[0]["network_name"] == "VN-TEST-1"
+    # trạng thái mốc: 70 >= 65 (10% của 648) -> mốc đầu ĐẠT
+    nets = client.get("/api/db/milestones").json()["networks"]
+    assert len(nets) == 1 and nets[0]["milestones"][0]["status"] == "DAT"
+    # xuất CSV
+    csv_r = client.get("/api/db/export.csv")
+    assert csv_r.status_code == 200 and "VN-TEST-1" in csv_r.text
+
+
 def test_docs_flow(client):
     # upload
     r = client.post("/api/docs",

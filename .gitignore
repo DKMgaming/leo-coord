@@ -10,6 +10,7 @@ __pycache__/
 out/
 *.db
 *.html
+!webapp/frontend/index.html
 
 # dữ liệu người dùng của web app (tài liệu tham luận upload lên)
 webapp/data/

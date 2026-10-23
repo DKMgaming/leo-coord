@@ -1,9 +1,9 @@
 # Web app leo_coord
 
 Giao diện web cho phần mềm `leo_coord` — chạy trên cùng engine Python đã kiểm thử
-(49 test pytest), không tính lại bằng JavaScript.
+(61 test pytest), không tính lại bằng JavaScript.
 
-## Hai tab chính
+## Ba tab chính
 
 - **Tab 1 — Chức năng chính + Bản đồ số 3D (CesiumJS):** nhập tham số chòm sao,
   chạy đánh giá (phủ sóng Việt Nam, PFD Article 21, EPFD Article 22, sàng lọc
@@ -16,6 +16,11 @@ Giao diện web cho phần mềm `leo_coord` — chạy trên cùng engine Pytho
   Word (.doc/.docx), Excel (.xls/.xlsx), PDF (.pdf), PowerPoint (.ppt/.pptx),
   tối đa 50 MB/file. File lưu tại `webapp/data/uploads/`, metadata tại
   `webapp/data/thamluan.db`.
+- **Tab 3 — CSDL phối hợp quốc gia:** nhập và quản lý hồ sơ đăng ký mạng vệ tinh,
+  báo cáo triển khai thực tế, vụ việc phối hợp quốc tế; xem trạng thái mốc
+  Res 35 của từng hồ sơ và xuất danh sách hồ sơ ra CSV. Dữ liệu nằm trong
+  SQLite `webapp/data/coord.db` — **dùng chung với CLI** (`leo-coord db ...`)
+  nên nhập ở web thì xem được ở CLI và ngược lại.
 
 ## Chạy
 
@@ -34,6 +39,8 @@ và địa hình ArcGIS là dịch vụ công cộng miễn phí, cần mạng �
 ## Cấu trúc
 
 - `backend/app.py` — FastAPI: `/api/assess`, `/api/tracks`, `/api/coverage-map`,
-  `/api/docs` (GET/POST), `/api/docs/{id}/download`, `/api/docs/{id}` (DELETE)
-- `frontend/` — `index.html`, `styles.css`, `app.js` (Three.js)
+  `/api/visible-sats`, `/api/docs` (GET/POST), `/api/docs/{id}/download`,
+  `/api/docs/{id}` (DELETE), `/api/db/filings`, `/api/db/deployments`,
+  `/api/db/cases`, `/api/db/milestones`, `/api/db/export.csv`
+- `frontend/` — `index.html`, `styles.css`, `app.js` (CesiumJS)
 - `data/` — uploads + SQLite (tạo tự động khi chạy)

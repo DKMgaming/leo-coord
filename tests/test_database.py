@@ -62,6 +62,18 @@ def test_coordination_cases(dbpath):
     assert len(rows) == 1 and rows[0]["other_system"] == "GSO-KU-105E"
 
 
+def test_list_deployments(dbpath):
+    db.add_filing(dbpath, network_name="VN-LEO-1", administration="VTN",
+                  n_sats_filed=100)
+    db.report_deployment(dbpath, "VN-LEO-1", "2025-01-01", 10, source="a")
+    db.report_deployment(dbpath, "VN-LEO-1", "2026-01-01", 40, source="b")
+    rows = db.list_deployments(dbpath)
+    assert [r["n_deployed"] for r in rows] == [40, 10]  # mới nhất trước
+    assert rows[0]["network_name"] == "VN-LEO-1"
+    assert db.list_deployments(dbpath, "VN-LEO-1")[0]["source"] == "b"
+    assert db.list_deployments(dbpath, "KHONG_CO") == []
+
+
 def test_export_csv(dbpath, tmp_path):
     db.add_filing(dbpath, network_name="VN-LEO-1", administration="VTN",
                   n_sats_filed=100)

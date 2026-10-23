@@ -6,6 +6,8 @@ Chạy từ thư mục gốc dự án:
 - Tab 1: các chức năng chính (phủ sóng, PFD, EPFD, phối hợp, milestone)
   + dữ liệu quỹ đạo cho bản đồ số 3D ở frontend.
 - Tab 2: thư viện tham luận — upload/tải/xóa file Word, Excel, PDF, PPTx.
+- Tab 3: CSDL phối hợp tần số vệ tinh quốc gia (SQLite) — hồ sơ đăng ký,
+  báo cáo triển khai thực tế, vụ việc phối hợp, trạng thái mốc Res 35.
 """
 from __future__ import annotations
 
@@ -29,6 +31,7 @@ from leo_coord.pfd import check_downlink_pfd
 from leo_coord.epfd import single_entry_epfd_down
 from leo_coord.coordination import screen_ngso_vs_gso
 from leo_coord.milestones import res35_schedule, evaluate, warehousing_flag
+from leo_coord import database as coorddb
 
 BASE = Path(__file__).resolve().parent.parent
 FRONTEND = BASE / "frontend"
@@ -298,6 +301,103 @@ def delete_doc(doc_id: str):
         c.execute("DELETE FROM documents WHERE id=?", (doc_id,))
     (UPLOADS / row["stored_name"]).unlink(missing_ok=True)
     return {"deleted": doc_id}
+
+
+# ---------------------------------------------------------------- API: tab 3 (CSDL phối hợp)
+def _coord_path():
+    """Đường dẫn CSDL phối hợp (dùng chung với CLI `leo-coord db`)."""
+    p = DATA / "coord.db"
+    coorddb.init_db(p)  # idempotent — tạo bảng nếu chưa có
+    return p
+
+
+def _opt_float(v):
+    return None if v in (None, "") else float(v)
+
+
+@app.get("/api/db/filings")
+def db_list_filings():
+    return {"filings": coorddb.list_filings(_coord_path())}
+
+
+@app.post("/api/db/filings")
+def db_add_filing(body: dict):
+    try:
+        fid = coorddb.add_filing(
+            _coord_path(),
+            network_name=str(body["network_name"]).strip(),
+            administration=str(body["administration"]).strip(),
+            n_sats_filed=int(body["n_sats_filed"]),
+            operator=str(body.get("operator", "") or ""),
+            bands=str(body.get("bands", "") or ""),
+            alt_km=_opt_float(body.get("alt_km")),
+            inc_deg=_opt_float(body.get("inc_deg")),
+            status=str(body.get("status", "API") or "API"),
+            api_date=body.get("api_date") or None,
+            biu_deadline=body.get("biu_deadline") or None,
+            notes=str(body.get("notes", "") or ""))
+    except sqlite3.IntegrityError:
+        raise HTTPException(400, "Tên mạng vệ tinh đã tồn tại trong CSDL")
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(400, f"Dữ liệu hồ sơ không hợp lệ: {e}")
+    return {"id": fid}
+
+
+@app.get("/api/db/deployments")
+def db_list_deployments(network_name: str = None):
+    return {"deployments": coorddb.list_deployments(_coord_path(), network_name)}
+
+
+@app.post("/api/db/deployments")
+def db_report_deployment(body: dict):
+    try:
+        did = coorddb.report_deployment(
+            _coord_path(), str(body["network_name"]), str(body["report_date"]),
+            int(body["n_deployed"]), str(body.get("source", "") or ""))
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return {"id": did}
+
+
+@app.get("/api/db/cases")
+def db_list_cases():
+    path = _coord_path()
+    names = {f["id"]: f["network_name"] for f in coorddb.list_filings(path)}
+    cases = coorddb.list_coordination_cases(path)
+    for c in cases:
+        c["network_name"] = names.get(c["filing_id"], "?")
+    return {"cases": cases}
+
+
+@app.post("/api/db/cases")
+def db_add_case(body: dict):
+    try:
+        cid = coorddb.add_coordination_case(
+            _coord_path(), str(body["network_name"]),
+            str(body["other_system"]), str(body.get("band", "") or ""),
+            str(body.get("trigger", "") or ""),
+            str(body.get("status", "MO") or "MO"),
+            str(body.get("notes", "") or ""))
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return {"id": cid}
+
+
+@app.get("/api/db/milestones")
+def db_milestones():
+    out = []
+    for item in coorddb.milestone_status(_coord_path()):
+        ms = [{**m, "due": m["due"].isoformat()} for m in item["milestones"]]
+        out.append({"network_name": item["network_name"], "milestones": ms})
+    return {"networks": out}
+
+
+@app.get("/api/db/export.csv")
+def db_export_csv():
+    out = DATA / "filings_export.csv"
+    coorddb.export_filings_csv(_coord_path(), out)
+    return FileResponse(out, filename="ho_so_phoi_hop.csv",
+                        media_type="text/csv")
 
 
 # ---------------------------------------------------------------- static

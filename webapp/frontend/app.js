@@ -9,6 +9,7 @@ document.querySelectorAll(".tab").forEach(btn => {
     btn.classList.add("active");
     document.getElementById(btn.dataset.tab).classList.add("active");
     if (btn.dataset.tab === "tab1" && window.__globe) window.__globe.resize();
+    if (btn.dataset.tab === "tab3") loadDb();
   });
 });
 
@@ -439,6 +440,135 @@ $("btn-upload").addEventListener("click", async () => {
   }
 });
 
+/* ---------------- tab 3: CSDL phối hợp quốc gia ---------------- */
+const DB_ST_CLS = {DAT: "ok", TRE_HAN: "bad", CHUA_DEN_HAN: "warn"};
+
+async function postDb(url, payload) {
+  const r = await fetch(url, {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || ("Lỗi " + r.status));
+  }
+  return r.json();
+}
+
+function fillNetSelects(names) {
+  ["dep_net", "case_net"].forEach(id => {
+    const sel = $(id), cur = sel.value;
+    sel.innerHTML = names.map(n =>
+      `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+    if (names.includes(cur)) sel.value = cur;
+  });
+}
+
+function latestDeployed(deployments, name) {
+  const rows = deployments.filter(x => x.network_name === name);
+  return rows.length ? rows[0].n_deployed : "—";  // đã xếp mới nhất trước
+}
+
+async function loadDb() {
+  try {
+    const [f, d, c, m] = await Promise.all([
+      fetch("/api/db/filings").then(r => r.json()),
+      fetch("/api/db/deployments").then(r => r.json()),
+      fetch("/api/db/cases").then(r => r.json()),
+      fetch("/api/db/milestones").then(r => r.json()),
+    ]);
+    renderDb(f.filings, d.deployments, c.cases, m.networks);
+  } catch (e) {
+    $("filings-body").innerHTML =
+      `<tr><td colspan="8" class="hint">Lỗi tải CSDL: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderDb(filings, deployments, cases, networks) {
+  $("filing-count").textContent = filings.length;
+  fillNetSelects(filings.map(f => f.network_name));
+  $("filings-body").innerHTML = filings.length ? filings.map(f => `<tr>
+    <td><b>${esc(f.network_name)}</b></td><td>${esc(f.administration)}</td>
+    <td>${esc(f.operator || "")}</td><td>${esc(f.bands || "")}</td>
+    <td>${f.n_sats_filed}</td><td>${latestDeployed(deployments, f.network_name)}</td>
+    <td>${esc(f.status || "")}</td><td>${esc(f.biu_deadline || "—")}</td></tr>`).join("")
+    : `<tr><td colspan="8" class="hint">Chưa có hồ sơ nào.</td></tr>`;
+
+  $("deployments-body").innerHTML = deployments.length ? deployments.map(d => `<tr>
+    <td>${esc(d.network_name)}</td><td>${esc(d.report_date)}</td>
+    <td>${d.n_deployed}</td><td>${esc(d.source || "")}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="hint">Chưa có báo cáo triển khai nào.</td></tr>`;
+
+  $("cases-body").innerHTML = cases.length ? cases.map(c => `<tr>
+    <td>${esc(c.network_name)}</td><td>${esc(c.other_system)}</td>
+    <td>${esc(c.band || "")}</td><td>${esc(c.trigger || "")}</td>
+    <td>${esc(c.status || "")}</td><td>${esc(c.notes || "")}</td></tr>`).join("")
+    : `<tr><td colspan="6" class="hint">Chưa có vụ việc phối hợp nào.</td></tr>`;
+
+  $("db-milestones").innerHTML = networks.length ? networks.map(n => `
+    <div class="card"><h3>${esc(n.network_name)} — trạng thái mốc Res 35</h3>
+    <table class="docs">
+    <tr><th>Mốc</th><th>Hạn</th><th>Cần</th><th>Đã có</th><th></th></tr>
+    ${n.milestones.map(m => `<tr><td>${m.percent}%</td><td>${esc(m.due)}</td>
+      <td>${m.required_n}</td><td>${m.deployed_n}</td>
+      <td>${badge(m.status, DB_ST_CLS[m.status] || "")}</td></tr>`).join("")}
+    </table></div>`).join("")
+    : `<div class="card"><p class="hint">Chưa có hồ sơ nào có hạn BIU để đánh giá mốc Res 35.</p></div>`;
+}
+
+$("btn-filing").addEventListener("click", async () => {
+  const st = $("filing-status");
+  const num = id => { const v = $(id).value; return v === "" ? null : parseFloat(v); };
+  try {
+    await postDb("/api/db/filings", {
+      network_name: $("n_name").value.trim(),
+      administration: $("n_admin").value.trim(),
+      operator: $("n_operator").value.trim(),
+      bands: $("n_bands").value.trim(),
+      n_sats_filed: parseInt($("n_nsats").value, 10),
+      alt_km: num("n_alt"), inc_deg: num("n_inc"),
+      status: $("n_status").value,
+      api_date: $("n_apidate").value || null,
+      biu_deadline: $("n_biu").value || null,
+      notes: $("n_notes").value.trim(),
+    });
+    st.textContent = "Đã thêm hồ sơ.";
+    loadDb();
+  } catch (e) { st.textContent = "Lỗi: " + e.message; }
+});
+
+$("btn-dep").addEventListener("click", async () => {
+  const st = $("dep-status");
+  try {
+    await postDb("/api/db/deployments", {
+      network_name: $("dep_net").value,
+      report_date: $("dep_date").value,
+      n_deployed: parseInt($("dep_n").value, 10),
+      source: $("dep_source").value.trim(),
+    });
+    st.textContent = "Đã ghi nhận báo cáo triển khai.";
+    loadDb();
+  } catch (e) { st.textContent = "Lỗi: " + e.message; }
+});
+
+$("btn-case").addEventListener("click", async () => {
+  const st = $("case-status");
+  try {
+    await postDb("/api/db/cases", {
+      network_name: $("case_net").value,
+      other_system: $("case_other").value.trim(),
+      band: $("case_band").value.trim(),
+      trigger: $("case_trigger").value.trim(),
+      status: $("case_st").value.trim() || "MO",
+      notes: $("case_notes").value.trim(),
+    });
+    st.textContent = "Đã thêm vụ việc phối hợp.";
+    loadDb();
+  } catch (e) { st.textContent = "Lỗi: " + e.message; }
+});
+
 /* ---------------- khởi động ---------------- */
+$("dep_date").value = new Date().toISOString().slice(0, 10);
 loadDocs();
+loadDb();
 initGlobe();

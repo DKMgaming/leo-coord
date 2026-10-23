@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>leo_coord — Quản lý tần số &amp; quỹ đạo vệ tinh LEO</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css">
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">🛰</div>
+    <div>
+      <h1>leo_coord</h1>
+      <p>Quản lý tần số &amp; quỹ đạo chòm sao vệ tinh LEO/NGSO</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="tab1">Chức năng chính + Bản đồ 3D</button>
+    <button class="tab" data-tab="tab2">Tham luận &amp; Tài liệu</button>
+    <button class="tab" data-tab="tab3">CSDL phối hợp quốc gia</button>
+  </nav>
+</header>
+
+<!-- ================= TAB 1 ================= -->
+<section id="tab1" class="tabpage active">
+  <aside class="sidebar">
+    <h2>Tham số chòm sao</h2>
+    <div class="presets">
+      <button id="preset-demo" class="btn small">Demo 120 vệ tinh</button>
+      <button id="preset-big" class="btn small">Mẫu 1000 vệ tinh</button>
+    </div>
+    <label>Tên chòm sao <input id="f_name" value="DEMO_LEO_KU"></label>
+    <div class="grid2">
+      <label>Độ cao (km)<input id="f_alt" type="number" value="550" min="300" max="2000"></label>
+      <label>Nghiêng (°)<input id="f_inc" type="number" value="53" min="0" max="180" step="0.1"></label>
+      <label>Số vệ tinh<input id="f_nsats" type="number" value="120" min="1" max="2400"></label>
+      <label>Mặt phẳng<input id="f_nplanes" type="number" value="6" min="1" max="100"></label>
+    </div>
+    <div class="grid2">
+      <label>Kiểu Walker
+        <select id="f_kind"><option value="delta">Delta</option><option value="star">Star</option></select>
+      </label>
+      <label>Băng tần xuống
+        <select id="f_band"><option value="10.7-12.7">10.7–12.7 GHz (Ku)</option><option value="17.7-19.3">17.7–19.3 GHz (Ka)</option></select>
+      </label>
+      <label>EIRP (dBW/MHz)<input id="f_eirp" type="number" value="10" step="0.5"></label>
+      <label>Kinh độ GSO (°)<input id="f_gsolon" type="number" value="105.5" step="0.5"></label>
+      <label>ĐK ăng-ten GSO (m)<input id="f_dish" type="number" value="1.2" step="0.1" min="0.3"></label>
+      <label>Hạn BIU (Res 35)<input id="f_biu" type="date" value="2024-03-01"></label>
+    </div>
+    <label>Đã triển khai <small>(ngày:số, cách nhau dấu phẩy)</small>
+      <input id="f_deployed" placeholder="2025-06-01:70" value="2025-06-01:70">
+    </label>
+    <button id="btn-assess" class="btn primary">▶ Chạy đánh giá</button>
+    <div id="assess-status" class="status"></div>
+    <h2>Kết quả</h2>
+    <div id="results"><p class="hint">Nhấn “Chạy đánh giá” để phân tích chòm sao.</p></div>
+  </aside>
+
+  <main class="viewport-wrap">
+    <div id="globe-error" class="globe-error hidden"></div>
+    <div id="viewport"></div>
+    <div class="globe-toolbar">
+      <button id="btn-play" class="btn small">⏸ Tạm dừng</button>
+      <label class="speed">Tốc độ <input id="speed" type="range" min="1" max="1000" value="120"><span id="speed-val">120×</span></label>
+      <label class="speed">Nền <select id="basemap">
+        <option value="esri">Ảnh vệ tinh</option>
+        <option value="osm">Bản đồ đường</option>
+        <option value="dark">Nền tối</option>
+      </select></label>
+      <label class="chk"><input type="checkbox" id="layer-sats" checked> Vệ tinh</label>
+      <label class="chk"><input type="checkbox" id="layer-orbits" checked> Quỹ đạo</label>
+      <label class="chk"><input type="checkbox" id="layer-cov" checked> Phủ sóng</label>
+      <span id="sim-clock" class="clock">T+00:00:00</span>
+    </div>
+    <div id="pick-info" class="pick-info hidden"></div>
+    <div class="pick-hint">🖱 Click vào quả cầu để tra cứu vệ tinh khả kiến tại điểm đó</div>
+    <div class="legend">
+      <span><i class="dot" style="background:#33d1ff"></i>Vệ tinh LEO</span>
+      <span><i class="dot" style="background:#ff9f1c"></i>Trạm VN</span>
+      <span><i class="dot" style="background:#c26bff"></i>Vệ tinh GSO</span>
+      <span><i class="dot" style="background:#2bd96a"></i>Phủ sóng tốt</span>
+      <span><i class="dot" style="background:#e5484d"></i>Phủ sóng kém</span>
+    </div>
+  </main>
+</section>
+
+<!-- ================= TAB 2 ================= -->
+<section id="tab2" class="tabpage">
+  <div class="docs-wrap">
+    <div class="card">
+      <h2>Đăng tham luận / tài liệu mới</h2>
+      <p class="hint">Đính kèm file Word, Excel, PDF, PowerPoint (tối đa 50 MB/file).</p>
+      <label>Tiêu đề <input id="d_title" placeholder="VD: Tham luận về phối hợp tần số NGSO-GSO"></label>
+      <label>Mô tả <input id="d_desc" placeholder="Tóm tắt nội dung (không bắt buộc)"></label>
+      <label>File đính kèm <input id="d_file" type="file"
+        accept=".doc,.docx,.xls,.xlsx,.pdf,.ppt,.pptx"></label>
+      <button id="btn-upload" class="btn primary">⬆ Tải lên</button>
+      <div id="upload-status" class="status"></div>
+    </div>
+    <div class="card">
+      <h2>Danh sách tham luận (<span id="doc-count">0</span>)</h2>
+      <table class="docs">
+        <thead><tr><th></th><th>Tiêu đề</th><th>File</th><th>Dung lượng</th>
+        <th>Ngày đăng</th><th></th></tr></thead>
+        <tbody id="docs-body"><tr><td colspan="6" class="hint">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+    <p class="hint">Tài liệu lưu trên máy chủ nội bộ của web app (thư mục <code>webapp/data/uploads</code>).</p>
+  </div>
+</section>
+
+<!-- ================= TAB 3 ================= -->
+<section id="tab3" class="tabpage">
+  <div class="db-wrap">
+    <div class="db-forms">
+      <div class="card">
+        <h2>Thêm hồ sơ đăng ký</h2>
+        <label>Tên mạng vệ tinh *<input id="n_name" placeholder="VD: VN-LEO-1"></label>
+        <label>Cơ quan đăng ký *<input id="n_admin" value="VTN"></label>
+        <label>Nhà khai thác<input id="n_operator"></label>
+        <label>Băng tần<input id="n_bands" placeholder="VD: 10.7-12.7 GHz"></label>
+        <div class="fgrid">
+          <label>Số vệ tinh đăng ký *<input id="n_nsats" type="number" min="1"></label>
+          <label>Trạng thái
+            <select id="n_status">
+              <option>API</option><option>COORDINATION</option>
+              <option>NOTIFICATION</option><option>MIFR</option><option>BIU</option>
+            </select></label>
+          <label>Độ cao (km)<input id="n_alt" type="number" step="0.1"></label>
+          <label>Nghiêng (°)<input id="n_inc" type="number" step="0.1"></label>
+          <label>Ngày API<input id="n_apidate" type="date"></label>
+          <label>Hạn BIU (Res 35)<input id="n_biu" type="date"></label>
+        </div>
+        <label>Ghi chú<input id="n_notes"></label>
+        <button id="btn-filing" class="btn primary">＋ Thêm hồ sơ</button>
+        <div id="filing-status" class="status"></div>
+      </div>
+      <div class="card">
+        <h2>Báo cáo triển khai thực tế</h2>
+        <label>Mạng vệ tinh <select id="dep_net"></select></label>
+        <div class="fgrid">
+          <label>Ngày báo cáo<input id="dep_date" type="date"></label>
+          <label>Số vệ tinh đã triển khai<input id="dep_n" type="number" min="0"></label>
+        </div>
+        <label>Nguồn số liệu<input id="dep_source" placeholder="VD: báo cáo của nhà khai thác"></label>
+        <button id="btn-dep" class="btn primary">＋ Ghi nhận</button>
+        <div id="dep-status" class="status"></div>
+      </div>
+      <div class="card">
+        <h2>Thêm vụ việc phối hợp</h2>
+        <label>Mạng vệ tinh <select id="case_net"></select></label>
+        <label>Hệ thống liên quan *<input id="case_other" placeholder="VD: GSO-KU-105E"></label>
+        <div class="fgrid">
+          <label>Băng tần<input id="case_band"></label>
+          <label>Trạng thái<input id="case_st" value="MO"></label>
+        </div>
+        <label>Điều kiện kích hoạt<input id="case_trigger" placeholder="VD: cung ±6° (Appendix 5)"></label>
+        <label>Ghi chú<input id="case_notes"></label>
+        <button id="btn-case" class="btn primary">＋ Thêm vụ việc</button>
+        <div id="case-status" class="status"></div>
+      </div>
+    </div>
+    <div class="db-main">
+      <div class="card">
+        <h2>Hồ sơ đăng ký (<span id="filing-count">0</span>)
+          <a class="btn small" style="float:right" href="/api/db/export.csv">⬇ Xuất CSV</a></h2>
+        <table class="docs">
+          <thead><tr><th>Mạng</th><th>Cơ quan</th><th>Khai thác</th><th>Băng tần</th>
+          <th>Đăng ký</th><th>Đã triển khai</th><th>Trạng thái</th><th>Hạn BIU</th></tr></thead>
+          <tbody id="filings-body"><tr><td colspan="8" class="hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+      <div id="db-milestones"></div>
+      <div class="card">
+        <h2>Lịch sử triển khai</h2>
+        <table class="docs">
+          <thead><tr><th>Mạng</th><th>Ngày báo cáo</th><th>Số vệ tinh</th><th>Nguồn</th></tr></thead>
+          <tbody id="deployments-body"><tr><td colspan="4" class="hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h2>Vụ việc phối hợp</h2>
+        <table class="docs">
+          <thead><tr><th>Mạng</th><th>Hệ thống liên quan</th><th>Băng tần</th>
+          <th>Kích hoạt</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
+          <tbody id="cases-body"><tr><td colspan="6" class="hint">Đang tải…</td></tr></tbody>
+        </table>
+      </div>
+      <p class="hint">Dữ liệu nằm trong CSDL SQLite dùng chung với CLI (<code>leo-coord db ...</code>),
+      file <code>webapp/data/coord.db</code>.</p>
+    </div>
+  </div>
+</section>
+
+<footer>Công cụ sàng lọc kỹ thuật — kết luận chính thức phải dựa trên văn bản ITU/FCC hiện hành và phần mềm của ITU BR.</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

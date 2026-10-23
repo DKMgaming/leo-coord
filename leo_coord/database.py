@@ -97,6 +97,20 @@ def list_filings(path) -> list:
                 c.execute("SELECT * FROM filings ORDER BY network_name")]
 
 
+def list_deployments(path, network_name=None) -> list:
+    """Lịch sử báo cáo triển khai (kèm tên mạng), báo cáo mới nhất trước."""
+    q = """SELECT d.*, f.network_name FROM deployments d
+           JOIN filings f ON d.filing_id = f.id"""
+    with _connect(path) as c:
+        if network_name:
+            rows = c.execute(q + " WHERE f.network_name=?"
+                             " ORDER BY d.report_date DESC, d.id DESC",
+                             (network_name,))
+        else:
+            rows = c.execute(q + " ORDER BY d.report_date DESC, d.id DESC")
+        return [dict(r) for r in rows]
+
+
 def add_coordination_case(path, network_name, other_system, band="",
                           trigger="", status="MO", notes="") -> int:
     with _connect(path) as c:
