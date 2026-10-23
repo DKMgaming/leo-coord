@@ -179,14 +179,36 @@ hai ngưỡng gắn `index-sourced-verify` (17.8–18.6 GHz, 19.7–20.2 GHz) v�
 
 ## Cài đặt
 
-Yêu cầu Python ≥ 3.10.
+Yêu cầu **Python ≥ 3.10** (khai báo tại `requires-python` trong
+`pyproject.toml`). Dự án được phát triển và kiểm thử trên **Python 3.12** —
+file `.python-version` ở thư mục gốc ghi bản khuyến nghị này.
+
+Cài toàn bộ thư viện phụ thuộc (engine + web app + kiểm thử) từ
+`requirements.txt`:
+
+Linux/macOS:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-# thêm cho web app:
-.venv/bin/pip install fastapi "uvicorn[standard]" python-multipart httpx
+.venv/bin/pip install -r requirements.txt
 ```
+
+Windows (PowerShell):
+
+```powershell
+py -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+```
+
+Cách khác — cài dạng package kèm extras (`dev` = pytest, `brific` =
+access-parser để đọc file .mdb SRS):
+
+```bash
+.venv/bin/pip install -e ".[dev,brific]"
+```
+
+Kiểm tra sau cài đặt: `.venv/bin/python -m pytest` (68 test phải qua) và
+`.venv/bin/leo-coord --help`.
 
 ## Chạy nhanh
 

@@ -1,0 +1,14 @@
+# leo_coord — thu vien phu thuoc (phien ban toi thieu = ban da kiem thu,
+# Python 3.12). Engine:
+numpy>=2.5.4
+PyYAML>=6.0.3
+sgp4>=2.27
+# Web app (FastAPI):
+fastapi>=0.150.0
+uvicorn[standard]>=0.54.0
+python-multipart>=0.0.32
+httpx>=0.28.1
+# Doc file .mdb SRS cua BR IFIC (chi can cho: leo-coord db import-brific voi file .mdb):
+access-parser>=0.0.6
+# Kiem thu:
+pytest>=9.1.1
