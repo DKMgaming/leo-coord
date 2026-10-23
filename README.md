@@ -101,6 +101,82 @@ Tài liệu API tương tác có tại `/docs` khi server đang chạy. Chi ti�
   văn bản gốc trước khi dùng chính thức**.
 - Toàn bộ dữ liệu trong `data/demo/` đều là **HƯ CẤU** và được gắn nhãn rõ ràng.
 
+## Quản trị cấu hình — cập nhật `configs/leo_coord.yaml` sau khi đối chiếu dữ liệu ITU
+
+Mọi ngưỡng quy định đều nằm trong `configs/leo_coord.yaml` (không hard-code
+trong mã nguồn). Trạng thái xác minh được ghi **theo từng mục** (trường
+`status`/`source` của từng bảng) và một dòng tổng ở đầu file
+(`verification_status`). Quản trị viên chỉ cập nhật file này theo quy trình
+sau — **không sửa giá trị khi chưa có văn bản gốc trong tay**.
+
+### Bước 1 — Chuẩn bị nguồn đối chiếu chính thức
+
+- Thể lệ Vô tuyến (RR) bản hiện hành: Article 21 (Table 21-4), Article 22
+  (Table 22-1A, 22-1B, 22-2...), Resolution 35 (bản sửa đổi mới nhất),
+  Appendix 5 (Table 5-1), Appendix 8, các điều khoản 9.7A/9.7B.
+- BR IFIC (Space) + Preface (cấu trúc SNS, mã trạng thái hồ sơ); khuyến nghị
+  ITU-R liên quan (S.1503, S.1714...). Quy định FCC (47 CFR Part 25) chỉ khi
+  đối chiếu riêng phần FCC.
+- Ghi rõ **ấn bản/năm** của từng văn bản dùng để đối chiếu.
+
+### Bước 2 — Đối chiếu từng mục và lập bảng chênh lệch
+
+Đối chiếu lần lượt: `pfd.bands`, `epfd` (điểm không-vượt-quá và đường cong
+Table 22-1A đầy đủ), `coordination.arcs`, `coordination.pfd_triggers_9_7`,
+`coordination.delta_T_over_T_trigger_percent`, `milestones.marks`.
+Lập bảng: *mục — giá trị hiện tại — giá trị văn bản gốc — chênh lệch — căn cứ
+(số điều/bảng)*. Các mục hiện đang gắn cờ chưa rõ phải được xử lý dứt điểm ở
+bước này, ví dụ: mức −202 dB(W/m²/40kHz) trong ghi chú của ngưỡng 9.7A/9.7B,
+hai ngưỡng gắn `index-sourced-verify` (17.8–18.6 GHz, 19.7–20.2 GHz) và
+đường cong mask đầy đủ của Table 22-1A. Mục nào chưa đối chiếu được thì
+**giữ nguyên** giá trị và cờ trạng thái — không tự suy đoán để điền.
+
+### Bước 3 — Cập nhật file
+
+1. Sửa giá trị của đúng mục đã đối chiếu; đổi `status` của mục đó từ
+   `index-sourced` thành `verified` và bổ sung căn cứ ngay tại chỗ, ví dụ:
+
+   ```yaml
+   - freq_ghz: "10.7-11.7"
+     delta_le_5: -150.0
+     status: "verified"   # RR 2024, Article 21, Table 21-4; doi chieu 2026-11-02, Nguyen Van A
+   ```
+
+2. Cập nhật `updated` ở đầu file thành ngày sửa; chỉ khi **mọi** mục đều đã
+   `verified` mới đổi `verification_status` tổng thành
+   `verified-itu-<YYYY-MM-DD>`. Tăng `version` nếu thay đổi làm đổi kết quả
+   đánh giá trên diện rộng.
+3. Không đổi cấu trúc khóa (tên trường) — mã nguồn và test phụ thuộc vào đó.
+
+### Bước 4 — Kiểm tra tác động trước khi dùng
+
+```bash
+.venv/bin/python -m pytest            # toàn bộ test phải qua (hiện 68 test)
+.venv/bin/leo-coord assess --constellation data/demo/constellation_demo.yaml --report out/truoc-sau.html
+```
+
+- Nếu test đỏ vì gắn với giá trị cũ: **dừng lại** — xác minh thay đổi là đúng
+  văn bản gốc rồi mới sửa test, và ghi rõ trong commit. Không sửa test cho
+  khớp một cách máy móc.
+- So sánh kết quả đánh giá trước/sau (biên PFD, kết luận phối hợp, mốc
+  Res 35) với chòm sao demo để chắc chắn thay đổi đúng ý đồ.
+
+### Bước 5 — Lưu hồ sơ và phân quyền
+
+- Commit với thông điệp nêu rõ mục đã sửa + căn cứ, ví dụ:
+  `config: doi chieu PFD Table 21-4 theo RR 2024 (verified)`.
+- Lưu bảng đối chiếu của Bước 2 tại `docs/doi-chieu-config-<YYYY-MM-DD>.md`.
+- Người sửa và người duyệt phải là **hai người khác nhau**; bản đã duyệt mới
+  được dùng cho đánh giá phục vụ công việc chính thức.
+
+### Mục không thuộc đối chiếu ITU
+
+- `vietnam.reference_points` (tọa độ các trạm tham chiếu): cập nhật theo số
+  liệu đo đạc/quyết định của cơ quan, ghi nguồn riêng — không lấy từ ITU.
+- `analysis` (góc ngẩng tối thiểu, bước lưới, bước thời gian): tham số mô
+  phỏng nội bộ, quản trị viên chỉnh theo yêu cầu phân tích, không cần đối
+  chiếu ITU nhưng phải ghi lý do khi thay đổi.
+
 ## Cài đặt
 
 Yêu cầu Python ≥ 3.10.
